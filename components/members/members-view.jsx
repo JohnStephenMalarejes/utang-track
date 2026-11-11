@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { ChevronRight, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { deleteMember } from "@/app/actions/members";
 import { useServerAction } from "@/hooks/use-server-action";
@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/layout/status-badge";
 import { Pagination } from "@/components/layout/pagination";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
 import { Avatar } from "@/components/layout/avatar";
+import { Meter } from "@/components/layout/kpi";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
 import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
@@ -80,15 +81,91 @@ export function MembersView({ ledger, initialOpen = false }) {
         </Button>
       </PageHeader>
 
-      <Card>
-        {members.length === 0 ? (
+      {members.length === 0 ? (
+        <Card>
           <EmptyState icon={Users} title="No members yet" description="Add the friends you split bills with. Everyone you add here can be chosen as a participant in an expense.">
             <Button onClick={() => openForm()}>
               <Plus /> Add First Member
             </Button>
           </EmptyState>
-        ) : (
-          <>
+        </Card>
+      ) : (
+        <>
+          {/* ==================== MOBILE SCREEN (< md) ==================== */}
+          <div className="space-y-3 md:hidden">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search members..."
+                aria-label="Search members"
+                className="h-10 rounded-xl bg-white pl-9"
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <Card>
+                <EmptyState icon={Search} title="No matching members" description="Try a different name or clear the search." />
+              </Card>
+            ) : (
+              <div className="space-y-2.5">
+                {rows.map((m) => {
+                  const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
+                  return (
+                    <div key={m.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
+                      <div className="flex items-start justify-between gap-3">
+                        <Link href={`/members/${m.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                          <Avatar name={m.name} id={m.id} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate text-[14.5px] font-semibold text-slate-900">{m.name}</p>
+                              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            </div>
+                            <p className="truncate text-[12px] text-slate-500">
+                              {m.contact || `${m.expenseCount} ${m.expenseCount === 1 ? "expense" : "expenses"}`}
+                            </p>
+                          </div>
+                        </Link>
+                        <div className="shrink-0 text-right">
+                          <p className="tabular text-[15px] font-bold text-slate-900">{formatPHP(m.balanceCents)}</p>
+                          <p className="text-[11px] text-slate-500">outstanding</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-3">
+                        <Meter value={pct} tone={pct >= 100 ? "bg-emerald-600" : "bg-teal-600"} className="h-1.5" />
+                        <span className="tabular shrink-0 text-[11px] text-slate-500">
+                          {formatPHP(m.paidCents)} / {formatPHP(m.assignedCents)}
+                        </span>
+                      </div>
+
+                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                        <StatusBadge status={m.status} />
+                        <div className="flex items-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${m.name}`} onClick={() => openForm(m)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" aria-label={`Delete ${m.name}`} onClick={() => askDelete(m)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Card className="overflow-hidden">
+                  <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+                </Card>
+              </div>
+            )}
+          </div>
+
+          {/* ==================== DESKTOP TABLE VIEW (md+) ==================== */}
+          <Card className="hidden md:block">
             <div className="border-b p-4">
               <div className="relative max-w-sm">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -156,9 +233,9 @@ export function MembersView({ ledger, initialOpen = false }) {
               </Table>
             )}
             <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-          </>
-        )}
-      </Card>
+          </Card>
+        </>
+      )}
 
       <MemberFormDialog open={formOpen} onOpenChange={setFormOpen} member={editing} />
 

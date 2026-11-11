@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Plus, Receipt, Search, Trash2, X } from "lucide-react";
+import { Eye, Pencil, Plus, Receipt, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { deleteExpense } from "@/app/actions/expenses";
 import { useServerAction } from "@/hooks/use-server-action";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -23,9 +22,17 @@ import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
 
 const NO_FILTERS = { query: "", from: "", to: "", category: "", member: "", status: "" };
 
+const STATUS_PILLS = [
+  { value: "", label: "All" },
+  { value: "unsettled", label: "Unsettled" },
+  { value: "partial", label: "Partial" },
+  { value: "settled", label: "Settled" },
+];
+
 export function ExpensesView({ ledger, initialOpen = false }) {
   const { expenses, members } = ledger;
   const [filters, setFilters] = useState(NO_FILTERS);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
@@ -38,6 +45,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
     setPage(1);
   };
   const filtersActive = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS);
+  const extraFilterCount = [filters.category, filters.member, filters.from, filters.to].filter(Boolean).length;
 
   const filtered = useMemo(() => {
     const q = filters.query.trim().toLowerCase();
@@ -90,15 +98,176 @@ export function ExpensesView({ ledger, initialOpen = false }) {
         </Button>
       </PageHeader>
 
-      <Card>
-        {expenses.length === 0 ? (
+      {expenses.length === 0 ? (
+        <Card>
           <EmptyState icon={Receipt} title="No expenses yet" description="Add a bill, choose who shared it and how to split it, and it will show up here.">
             <Button onClick={() => openForm()}>
               <Plus /> Add First Expense
             </Button>
           </EmptyState>
-        ) : (
-          <>
+        </Card>
+      ) : (
+        <>
+          {/* ==================== MOBILE SCREEN (< md) ==================== */}
+          <div className="space-y-3 md:hidden">
+            {/* Search + Filter Toggle */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={filters.query}
+                  onChange={setFilter("query")}
+                  placeholder="Search bills, notes, members..."
+                  aria-label="Search expenses"
+                  className="h-10 rounded-xl bg-white pl-9"
+                />
+              </div>
+              <Button
+                type="button"
+                variant={showMobileFilters || extraFilterCount > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowMobileFilters((v) => !v)}
+                className="h-10 shrink-0 rounded-xl px-3"
+                aria-expanded={showMobileFilters}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {extraFilterCount > 0 && (
+                  <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-slate-950">
+                    {extraFilterCount}
+                  </span>
+                )}
+              </Button>
+            </div>
+
+            {/* Quick Status Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              {STATUS_PILLS.map((pill) => {
+                const active = filters.status === pill.value;
+                return (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, status: pill.value }));
+                      setPage(1);
+                    }}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${
+                      active
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters(NO_FILTERS);
+                    setPage(1);
+                  }}
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-teal-700"
+                >
+                  <X className="h-3 w-3" /> Reset
+                </button>
+              )}
+            </div>
+
+            {/* Collapsible Extra Filters Panel */}
+            {showMobileFilters && (
+              <Card className="space-y-3 p-3.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Select aria-label="Filter by category" value={filters.category} onChange={setFilter("category")}>
+                    <option value="">All categories</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </Select>
+                  <Select aria-label="Filter by member" value={filters.member} onChange={setFilter("member")}>
+                    <option value="">All members</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <label className="space-y-1 text-[11px] font-medium text-slate-600">
+                    <span>From date</span>
+                    <Input type="date" value={filters.from} onChange={setFilter("from")} aria-label="From date" className="h-9" />
+                  </label>
+                  <label className="space-y-1 text-[11px] font-medium text-slate-600">
+                    <span>To date</span>
+                    <Input type="date" value={filters.to} onChange={setFilter("to")} aria-label="To date" className="h-9" />
+                  </label>
+                </div>
+              </Card>
+            )}
+
+            {/* Mobile Expense Cards */}
+            {filtered.length === 0 ? (
+              <Card>
+                <EmptyState icon={Search} title="No matching expenses" description="Try widening the date range or clearing a filter.">
+                  <Button variant="outline" onClick={() => (setFilters(NO_FILTERS), setPage(1))}>
+                    Clear filters
+                  </Button>
+                </EmptyState>
+              </Card>
+            ) : (
+              <div className="space-y-2.5">
+                {rows.map((e) => {
+                  const people = [...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)];
+                  return (
+                    <div
+                      key={e.id}
+                      className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs transition-colors active:bg-slate-50/70"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setViewing(e)}
+                          className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                        >
+                          <p className="truncate text-[14.5px] font-semibold text-slate-900">{e.description}</p>
+                          <p className="mt-0.5 text-[12px] text-slate-500">
+                            {formatDate(e.date)} · <span className="font-medium text-slate-700">{e.category}</span> · Paid by {e.paidByName ?? "You"}
+                          </p>
+                        </button>
+                        <p className="tabular shrink-0 text-[15px] font-bold text-slate-900">{formatPHP(e.totalCents)}</p>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <StatusBadge status={e.status} />
+                          <span className="truncate text-[11.5px] text-slate-500">{people.join(", ")}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`View ${e.description}`} onClick={() => setViewing(e)}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${e.description}`} onClick={() => openForm(e)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" aria-label={`Delete ${e.description}`} onClick={() => setToDelete(e)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Card className="overflow-hidden">
+                  <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+                </Card>
+              </div>
+            )}
+          </div>
+
+          {/* ==================== DESKTOP TABLE VIEW (md+) ==================== */}
+          <Card className="hidden md:block">
             <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-6">
               <div className="relative sm:col-span-2 lg:col-span-2">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -203,9 +372,9 @@ export function ExpensesView({ ledger, initialOpen = false }) {
               </Table>
             )}
             <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-          </>
-        )}
-      </Card>
+          </Card>
+        </>
+      )}
 
       <ExpenseFormDialog open={formOpen} onOpenChange={setFormOpen} ledger={ledger} expense={editing} />
       <ExpenseDetailDialog expense={viewingLive} onOpenChange={(o) => !o && setViewing(null)} />

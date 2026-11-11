@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { format } from "date-fns";
-import { BarChart3, ChevronRight, LayoutDashboard, LogOut, Menu, Plus, Receipt, Settings, Users, Wallet, X } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronRight, LayoutDashboard, LogOut, Plus, Receipt, Settings, Users, Wallet } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,14 @@ const NAV_GROUPS = [
     label: "Insights",
     items: [{ href: "/reports", label: "Reports", icon: BarChart3 }],
   },
+];
+
+const MOBILE_TABS = [
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/payments", label: "Payments", icon: Wallet },
+  { href: "/members", label: "Members", icon: Users },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
 const ALL_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), { href: "/settings", label: "Settings", icon: Settings }];
@@ -55,7 +63,7 @@ function Brand({ dark = true }) {
     <Link href="/dashboard" className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500">
       <BrandMark surface={dark ? "card" : "light"} />
       <span className={cn("text-[14.5px] font-semibold tracking-[-0.01em]", dark ? "text-white" : "text-slate-900")}>
-        utang <span className="font-normal text-emerald-400">tracker</span>
+        utang <span className={cn("font-normal", dark ? "text-emerald-400" : "text-teal-600")}>tracker</span>
       </span>
     </Link>
   );
@@ -177,21 +185,104 @@ function Topbar({ pathname }) {
   );
 }
 
-export function Sidebar({ email }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => setOpen(false), [pathname]);
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+/** Mobile top app header + fixed bottom tab navigation bar for smaller devices (< lg). */
+function MobileAppShell({ pathname }) {
+  const current = ALL_ITEMS.find((i) => isActive(pathname, i.href));
+  const isDetail = current && pathname !== current.href;
+  const settingsActive = isActive(pathname, "/settings");
 
   return (
     <>
-      {/* Desktop */}
+      {/* Mobile App Top Bar */}
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/90 bg-white/95 px-3.5 backdrop-blur lg:hidden">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {isDetail ? (
+            <Link
+              href={current.href}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs active:bg-slate-50"
+              aria-label={`Back to ${current.label}`}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          ) : (
+            <Link href="/dashboard" aria-label="Utang Tracker Home">
+              <BrandMark surface="card" className="h-8 w-8" />
+            </Link>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-slate-900">
+              {isDetail ? `${current.label} · Details` : current?.label || "Utang Tracker"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button asChild size="sm" className="h-8 rounded-full px-3 text-[12px]">
+            <Link href="/expenses?new=1" aria-label="New expense">
+              <Plus className="h-3.5 w-3.5" /> Expense
+            </Link>
+          </Button>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            aria-current={settingsActive ? "page" : undefined}
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
+              settingsActive
+                ? "border-teal-600 bg-teal-50 text-teal-700"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            )}
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        </div>
+      </header>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Bottom Navigation"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/90 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-6px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
+      >
+        <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-1">
+          {MOBILE_TABS.map(({ href, label, icon: Icon }) => {
+            const active = isActive(pathname, href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "group relative flex h-full flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none",
+                  active ? "text-teal-700" : "text-slate-500 hover:text-slate-900"
+                )}
+              >
+                {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-teal-600" aria-hidden="true" />}
+                <span
+                  className={cn(
+                    "flex h-7 w-11 items-center justify-center rounded-full transition-colors",
+                    active ? "bg-teal-50 text-teal-700" : "group-hover:bg-slate-100"
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 1.85} />
+                </span>
+                <span className={cn("text-[10.5px] leading-none tracking-[-0.01em]", active ? "font-semibold text-teal-800" : "font-medium text-slate-500")}>
+                  {label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
+  );
+}
+
+export function Sidebar({ email }) {
+  const pathname = usePathname();
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-slate-900 text-slate-100 lg:flex">
         <div className="flex h-14 items-center border-b border-slate-800 px-5">
           <Brand />
@@ -199,49 +290,11 @@ export function Sidebar({ email }) {
         <SidebarPanel email={email} pathname={pathname} />
       </aside>
 
+      {/* Desktop Topbar */}
       <Topbar pathname={pathname} />
 
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between bg-slate-900 px-4 text-white lg:hidden">
-        <Brand />
-        <div className="flex items-center gap-1.5">
-          <Button asChild size="sm" variant="accent" className="h-8">
-            <Link href="/expenses?new=1" aria-label="New expense">
-              <Plus /> New
-            </Link>
-          </Button>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label="Open navigation"
-            aria-expanded={open}
-            className="rounded-md p-2 text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
-          <button type="button" aria-label="Close navigation" className="absolute inset-0 bg-slate-950/60 animate-in fade-in-0" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-slate-900 text-slate-100 shadow-pop animate-in slide-in-from-left duration-200">
-            <div className="flex h-14 items-center justify-between border-b border-slate-800 px-4">
-              <Brand />
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close navigation"
-                className="rounded-md p-2 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <SidebarPanel email={email} pathname={pathname} onNavigate={() => setOpen(false)} />
-          </div>
-        </div>
-      )}
+      {/* Mobile Screen App Bar + Bottom Navigation */}
+      <MobileAppShell pathname={pathname} />
     </>
   );
 }
