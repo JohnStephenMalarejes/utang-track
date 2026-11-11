@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Palette: #222831 primary, #393E46 secondary, #00ADB5 accent, #F8FAFC background */
+    --background: 210 40% 98%;
+    --foreground: 215 18% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 18% 16%;
+    --primary: 215 18% 16%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 10% 25%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 183 100% 35.5%;
+    --accent-foreground: 215 18% 16%;
+    --accent-strong: 183 100% 25%; /* darker teal for text on white (contrast) */
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 12% 40%;
+    --border: 214 24% 89%;
+    --input: 214 20% 82%;
+    --ring: 183 100% 35.5%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 70% 25%;
+    --success-soft: 152 55% 92%;
+    --warning: 28 90% 30%;
+    --warning-soft: 40 95% 91%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Money and counts line up in columns */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
