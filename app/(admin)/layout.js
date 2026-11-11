@@ -18,8 +18,8 @@ export default async function AdminLayout({ children }) {
   if (!isAdmin) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 px-4">
-        <h1 className="text-lg font-semibold">This account isn't the administrator</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-lg font-semibold tracking-[-0.01em]">This account isn't the administrator</h1>
+        <p className="text-[13.5px] leading-relaxed text-muted-foreground">
           {user.email} is signed in ({user.id}) but hasn't been registered as the admin. Run the "register the administrator" SQL step from the README, then sign in
           again.
         </p>
@@ -38,9 +38,9 @@ export default async function AdminLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen lg:pl-64">
-      <Sidebar />
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+    <div className="min-h-screen lg:pl-60">
+      <Sidebar email={user.email} />
+      <main className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
     </div>
   );
 }

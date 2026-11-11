@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
+import { Kpi, KpiStrip } from "@/components/layout/kpi";
 import { CategoryChart, SettlementChart } from "@/components/dashboard/charts";
 import { categoryTotals, expenseEntries, summarize, total } from "@/lib/calculations/analytics";
 import { statusFor } from "@/lib/calculations/ledger";
@@ -26,15 +27,7 @@ const GRANULARITY = [
 ];
 
 function Stat({ label, value, hint }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <p className="text-[13px] text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold tracking-tight tabular">{value}</p>
-        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
+  return <Kpi label={label} value={value} hint={hint} />;
 }
 
 export function ReportsView({ ledger }) {
@@ -104,7 +97,7 @@ export function ReportsView({ ledger }) {
 
   return (
     <>
-      <PageHeader title="Reports" description="Summaries, balances and trends.">
+      <PageHeader eyebrow="Insights" title="Reports" description="Summaries, balances and trends for any date range.">
         <PdfExportButton
           filename={`utang-tracker-report-${todayISO()}.pdf`}
           shareTitle="Utang Tracker Report"
@@ -120,17 +113,17 @@ export function ReportsView({ ledger }) {
 
       <Card className="mb-6">
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
-          <label className="space-y-1 text-xs text-muted-foreground">
-            From
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40 text-foreground" />
+          <label className="space-y-1.5">
+            <span className="eyebrow block">From</span>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
           </label>
-          <label className="space-y-1 text-xs text-muted-foreground">
-            To
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40 text-foreground" />
+          <label className="space-y-1.5">
+            <span className="eyebrow block">To</span>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
           </label>
-          <label className="space-y-1 text-xs text-muted-foreground">
-            Member
-            <Select value={memberId} onChange={(e) => setMemberId(e.target.value)} className="w-48 text-foreground">
+          <label className="space-y-1.5">
+            <span className="eyebrow block">Member</span>
+            <Select value={memberId} onChange={(e) => setMemberId(e.target.value)} className="w-48">
               <option value="">All members</option>
               {ledger.members.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -160,12 +153,12 @@ export function ReportsView({ ledger }) {
         </Card>
       ) : (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiStrip>
             <Stat label="Total expenses" value={formatPHP(total(entries))} hint={`${scoped.length} ${scoped.length === 1 ? "transaction" : "transactions"}`} />
-            <Stat label="Total outstanding debts" value={formatPHP(outstandingCents)} />
-            <Stat label="Total settled debts" value={formatPHP(settledCents)} />
+            <Stat label="Outstanding" value={formatPHP(outstandingCents)} hint="Still owed in this range" />
+            <Stat label="Settled" value={formatPHP(settledCents)} hint="Paid back in this range" />
             <Stat label="Payments recorded" value={formatPHP(sumCents(payments.map((p) => p.amountCents)))} hint={`${payments.length} ${payments.length === 1 ? "payment" : "payments"}`} />
-          </div>
+          </KpiStrip>
 
           <Card>
             <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -173,15 +166,15 @@ export function ReportsView({ ledger }) {
                 <CardTitle>Expense summary</CardTitle>
                 <CardDescription>Spending grouped by day, week (Mon–Sun) or month</CardDescription>
               </div>
-              <div className="inline-flex rounded-md border bg-muted p-0.5" role="group" aria-label="Group by">
+              <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5" role="group" aria-label="Group by">
                 {GRANULARITY.map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
                     aria-pressed={granularity === value}
                     onClick={() => setGranularity(value)}
-                    className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      granularity === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 ${
+                      granularity === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
                     {label}
@@ -351,11 +344,11 @@ function SpendingBarChartInline({ data }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke="#e8edf3" />
-        <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#5b6573" }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
-        <YAxis tick={{ fontSize: 12, fill: "#5b6573" }} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => (v >= 1000 ? `₱${+(v / 1000).toFixed(1)}k` : `₱${v}`)} />
-        <Tooltip formatter={(v) => [formatPHP(Math.round(Number(v) * 100)), "Spent"]} contentStyle={{ borderRadius: 8, border: "1px solid #dfe5ec", fontSize: 12 }} cursor={{ fill: "#f1f5f9" }} />
-        <Bar dataKey="amount" fill="#00ADB5" radius={[4, 4, 0, 0]} maxBarSize={36} />
+        <CartesianGrid vertical={false} stroke="#EDF0F3" />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#7A828E", fontFamily: "var(--font-geist-mono)" }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} dy={6} />
+        <YAxis tick={{ fontSize: 11, fill: "#7A828E", fontFamily: "var(--font-geist-mono)" }} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => (v >= 1000 ? `₱${+(v / 1000).toFixed(1)}k` : `₱${v}`)} />
+        <Tooltip formatter={(v) => [formatPHP(Math.round(Number(v) * 100)), "Spent"]} contentStyle={{ borderRadius: 6, border: "1px solid #E3E7EB", fontSize: 12, boxShadow: "0 12px 32px -8px rgb(16 24 40 / 0.18)" }} cursor={{ fill: "#F3F5F7" }} />
+        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
   );

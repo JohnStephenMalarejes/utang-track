@@ -58,7 +58,7 @@ export function PaymentsView({ ledger }) {
 
   return (
     <>
-      <PageHeader title="Payments" description="Record what people have paid back. Balances update immediately.">
+      <PageHeader eyebrow="Ledger" title="Payments" description="Record what people have paid back. Balances update immediately.">
         <Button onClick={() => openForm()}>
           <Plus /> Record payment
         </Button>

@@ -2,67 +2,103 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { CheckCircle2, Clock, HandCoins, Plus, Receipt, Users } from "lucide-react";
+import { ArrowUpRight, Plus, Receipt, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
+import { Kpi, KpiStrip, Meter } from "@/components/layout/kpi";
+import { Avatar } from "@/components/layout/avatar";
 import { CategoryChart, SettlementChart, SpendingBarChart } from "./charts";
 import { categoryTotals, expenseEntries, lastDaysSeries, lastMonthsSeries } from "@/lib/calculations/analytics";
 import { buildLedgerPdf, formatDateLong, formatPHP, todayISO } from "@/lib/utils";
 
-function SummaryCard({ label, value, icon: Icon, hint }) {
+function SectionTitle({ id, title, action }) {
   return (
-    <Card>
-      <CardContent className="flex items-start justify-between gap-3 p-5">
-        <div className="min-w-0">
-          <p className="text-[13px] text-muted-foreground">{label}</p>
-          <p className="mt-2 truncate text-2xl font-semibold tracking-tight tabular">{value}</p>
-          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+    <div className="mb-3 flex items-center justify-between">
+      <h2 id={id} className="text-[14px] font-semibold tracking-[-0.01em]">
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+/** Ranked list of who still owes money, with how much of their share has come back. */
+function Receivables({ members }) {
+  const ranked = useMemo(
+    () => [...members].filter((m) => m.expenseCount > 0).sort((a, b) => b.balanceCents - a.balanceCents),
+    [members]
+  );
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="flex-row items-start justify-between space-y-0 border-b pb-4">
+        <div className="space-y-1">
+          <CardTitle>Who owes you</CardTitle>
+          <CardDescription>Ranked by outstanding balance</CardDescription>
         </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-secondary">
-          <Icon className="h-4 w-4" />
-        </span>
+        {members.length > 0 && (
+          <Button asChild variant="ghost" size="sm" className="-mr-2">
+            <Link href="/members">
+              All members <ArrowUpRight />
+            </Link>
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="flex-1 p-0">
+        {members.length === 0 ? (
+          <EmptyState icon={Users} title="No members yet" description="Add the people you share expenses with to start tracking who owes what.">
+            <Button asChild size="sm">
+              <Link href="/members?new=1">
+                <Plus /> Add member
+              </Link>
+            </Button>
+          </EmptyState>
+        ) : ranked.length === 0 ? (
+          <EmptyState icon={Users} title="Nobody owes anything" description="Balances appear here once members are added to an expense." />
+        ) : (
+          <ul className="divide-y">
+            {ranked.map((m) => {
+              const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
+              return (
+                <li key={m.id}>
+                  <Link
+                    href={`/members/${m.id}`}
+                    className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                  >
+                    <Avatar name={m.name} id={m.id} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="truncate text-[13.5px] font-medium">{m.name}</p>
+                        <p className={`tabular shrink-0 text-[13.5px] font-medium ${m.balanceCents > 0 ? "" : "text-muted-foreground"}`}>
+                          {formatPHP(Math.max(m.balanceCents, 0))}
+                        </p>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-3">
+                        <Meter value={pct} tone={pct >= 100 ? "bg-success" : "bg-accent"} className="h-1" />
+                        <span className="tabular w-24 shrink-0 text-right text-[11.5px] text-muted-foreground">
+                          {formatPHP(m.paidCents)} paid
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function MemberCard({ member }) {
-  return (
-    <Link
-      href={`/members/${member.id}`}
-      className="block rounded-xl border bg-card p-4 shadow-card transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="truncate font-medium">{member.name}</p>
-        <StatusBadge status={member.status} />
-      </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <div>
-          <dt className="text-muted-foreground">Assigned</dt>
-          <dd className="mt-0.5 font-medium tabular">{formatPHP(member.assignedCents)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Paid</dt>
-          <dd className="mt-0.5 font-medium tabular">{formatPHP(member.paidCents)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Outstanding</dt>
-          <dd className="mt-0.5 font-semibold tabular">{formatPHP(member.balanceCents)}</dd>
-        </div>
-      </dl>
-    </Link>
-  );
-}
-
-function RecentTransactions({ expenses }) {
+function RecentActivity({ expenses }) {
   const groups = useMemo(() => {
     const map = new Map();
-    for (const e of expenses.slice(0, 10)) {
+    for (const e of expenses.slice(0, 8)) {
       if (!map.has(e.date)) map.set(e.date, []);
       map.get(e.date).push(e);
     }
@@ -70,49 +106,55 @@ function RecentTransactions({ expenses }) {
   }, [expenses]);
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+    <Card className="flex flex-col">
+      <CardHeader className="flex-row items-start justify-between space-y-0 border-b pb-4">
         <div className="space-y-1">
-          <CardTitle>Recent transactions</CardTitle>
-          <CardDescription>Your latest expenses, grouped by date</CardDescription>
+          <CardTitle>Recent expenses</CardTitle>
+          <CardDescription>Latest bills, grouped by day</CardDescription>
         </div>
         {expenses.length > 0 && (
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/expenses">View all</Link>
+          <Button asChild variant="ghost" size="sm" className="-mr-2">
+            <Link href="/expenses">
+              View all <ArrowUpRight />
+            </Link>
           </Button>
         )}
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex-1 p-0">
         {groups.length === 0 ? (
           <EmptyState icon={Receipt} title="No expenses yet" description="Recorded expenses will show up here, newest first.">
-            <Button asChild>
+            <Button asChild size="sm">
               <Link href="/expenses?new=1">
-                <Plus /> Add First Expense
+                <Plus /> Add expense
               </Link>
             </Button>
           </EmptyState>
         ) : (
           groups.map(([date, items]) => (
             <section key={date} aria-label={formatDateLong(date)}>
-              <h3 className="border-y bg-muted/60 px-5 py-1.5 text-xs font-medium text-muted-foreground first:border-t-0">{formatDateLong(date)}</h3>
+              <h3 className="eyebrow border-b bg-muted/40 px-5 py-1.5">{formatDateLong(date)}</h3>
               <ul className="divide-y">
-                {items.map((e) => (
-                  <li key={e.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{e.description}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                        <Badge variant="outline">{e.category}</Badge>
-                        <span className="truncate">
-                          {[...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)].join(", ")}
+                {items.map((e) => {
+                  const people = [...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)];
+                  return (
+                    <li key={e.id} className="flex items-center justify-between gap-4 px-5 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[13.5px] font-medium">{e.description}</p>
+                        <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                          <span className="text-foreground/70">{e.category}</span>
+                          <span className="mx-1.5 text-subtle">·</span>
+                          {people.join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="hidden sm:inline-flex">
+                          <StatusBadge status={e.status} />
                         </span>
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
-                      <StatusBadge status={e.status} />
-                      <span className="w-28 text-right text-sm font-semibold tabular">{formatPHP(e.totalCents)}</span>
-                    </div>
-                  </li>
-                ))}
+                        <span className="tabular w-24 text-right text-[13.5px] font-medium">{formatPHP(e.totalCents)}</span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))
@@ -130,16 +172,19 @@ export function DashboardView({ ledger }) {
   const monthly = useMemo(() => lastMonthsSeries(entries, 6), [entries]);
   const categories = useMemo(() => categoryTotals(entries), [entries]);
 
+  const owedTotal = totals.settledCents + totals.outstandingCents;
+  const collectedPct = owedTotal > 0 ? (totals.settledCents / owedTotal) * 100 : 0;
+  const debtors = members.filter((m) => m.balanceCents > 0).length;
+
   return (
     <>
-      <PageHeader title="Dashboard" description="Where everyone stands right now.">
+      <PageHeader eyebrow="Overview" title="Where everyone stands" description="Outstanding balances, recent bills and spending trends.">
         {(expenses.length > 0 || members.length > 0) && (
           <PdfExportButton
             filename={`utang-tracker-summary-${todayISO()}.pdf`}
             shareTitle="Utang Tracker Summary"
             getPdfBytes={() =>
               buildLedgerPdf({
-                title: "Ledger Summary",
                 members,
                 expenses,
                 payments: ledger.payments,
@@ -147,68 +192,36 @@ export function DashboardView({ ledger }) {
             }
           />
         )}
-        <Button asChild>
-          <Link href="/expenses?new=1">
-            <Plus /> Add expense
-          </Link>
-        </Button>
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Total Outstanding Debt" value={formatPHP(totals.outstandingCents)} icon={HandCoins} hint="Still owed to you" />
-        <SummaryCard label="Total Settled" value={formatPHP(totals.settledCents)} icon={CheckCircle2} hint="Payments received" />
-        <SummaryCard label="Total Expenses" value={formatPHP(totals.expensesCents)} icon={Receipt} hint="Across all bills" />
-        <SummaryCard
-          label="Unsettled Transactions"
-          value={String(totals.unsettledCount)}
-          icon={Clock}
-          hint={`${totals.expenseCount} ${totals.expenseCount === 1 ? "transaction" : "transactions"} in total`}
-        />
+      <KpiStrip>
+        <Kpi label="Outstanding" tone="bg-destructive" value={formatPHP(totals.outstandingCents)} hint={`Owed by ${debtors} ${debtors === 1 ? "member" : "members"}`} />
+        <Kpi label="Collected" tone="bg-success" value={formatPHP(totals.settledCents)} hint={`${totals.paymentCount} ${totals.paymentCount === 1 ? "payment" : "payments"} received`}>
+          <div className="mt-1 flex items-center gap-2">
+            <Meter value={collectedPct} tone="bg-success" className="h-1" />
+            <span className="tabular text-[11px] text-muted-foreground">{Math.round(collectedPct)}%</span>
+          </div>
+        </Kpi>
+        <Kpi label="Total spent" value={formatPHP(totals.expensesCents)} hint={`Across ${totals.expenseCount} ${totals.expenseCount === 1 ? "bill" : "bills"}`} />
+        <Kpi label="Open bills" tone="bg-warning" value={String(totals.unsettledCount)} hint={`of ${totals.expenseCount} not fully settled`} />
+      </KpiStrip>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <Receivables members={members} />
+        </div>
+        <div className="lg:col-span-3">
+          <RecentActivity expenses={expenses} />
+        </div>
       </div>
 
-      <section className="mt-8" aria-labelledby="members-overview">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 id="members-overview" className="text-base font-semibold">
-            Members overview
-          </h2>
-          {members.length > 0 && (
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/members">Manage members</Link>
-            </Button>
-          )}
-        </div>
-        {members.length === 0 ? (
-          <Card>
-            <EmptyState icon={Users} title="No members yet" description="Add the people you share expenses with to start tracking who owes what.">
-              <Button asChild>
-                <Link href="/members?new=1">
-                  <Plus /> Add First Member
-                </Link>
-              </Button>
-            </EmptyState>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {members.map((m) => (
-              <MemberCard key={m.id} member={m} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <RecentTransactions expenses={expenses} />
-      </section>
-
       <section className="mt-8" aria-labelledby="analytics">
-        <h2 id="analytics" className="mb-3 text-base font-semibold">
-          Analytics
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SpendingBarChart title="Daily expenses" description="Last 14 days" data={daily} emptyText="No expenses in the last 14 days" />
-          <SpendingBarChart title="Monthly expenses" description="Last 6 months" data={monthly} emptyText="No expenses in the last 6 months" tickInterval={0} />
-          <CategoryChart description="Share of total spending" data={categories} />
-          <SettlementChart description="Payments received vs still owed" settledCents={totals.settledCents} outstandingCents={totals.outstandingCents} />
+        <SectionTitle id="analytics" title="Spending" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SpendingBarChart title="Daily" description="Last 14 days" data={daily} emptyText="No expenses in the last 14 days" />
+          <SpendingBarChart title="Monthly" description="Last 6 months" data={monthly} emptyText="No expenses in the last 6 months" tickInterval={0} />
+          <CategoryChart title="By category" description="Share of total spending" data={categories} />
+          <SettlementChart title="Collection" description="Received vs still owed" settledCents={totals.settledCents} outstandingCents={totals.outstandingCents} />
         </div>
       </section>
     </>

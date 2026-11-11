@@ -71,7 +71,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
 
   return (
     <>
-      <PageHeader title="Expenses" description="Every shared bill and how it was split.">
+      <PageHeader eyebrow="Ledger" title="Expenses" description="Every shared bill and how it was split.">
         {filtered.length > 0 && (
           <PdfExportButton
             filename={`utang-tracker-expenses-${todayISO()}.pdf`}
@@ -169,12 +169,10 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                     <TableRow key={e.id}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(e.date)}</TableCell>
                       <TableCell>
-                        <button type="button" onClick={() => setViewing(e)} className="text-left font-medium hover:text-accent-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <button type="button" onClick={() => setViewing(e)} className="text-left font-medium hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           {e.description}
                         </button>
-                        <div className="mt-1">
-                          <Badge variant="outline">{e.category}</Badge>
-                        </div>
+                        <div className="mt-0.5 text-[12px] text-muted-foreground">{e.category}</div>
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground xl:table-cell">{e.paidByName ?? "You"}</TableCell>
                       <TableCell className="hidden max-w-[14rem] text-muted-foreground lg:table-cell">

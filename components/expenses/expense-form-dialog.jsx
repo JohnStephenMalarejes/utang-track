@@ -225,7 +225,7 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
               <fieldset className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <legend className="text-[13px] font-medium">Participants and shares</legend>
-                  <div className="inline-flex rounded-md border bg-muted p-0.5" role="group" aria-label="Splitting method">
+                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5" role="group" aria-label="Splitting method">
                     {[
                       ["equal", "Equal split"],
                       ["custom", "Custom split"],
@@ -236,8 +236,8 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                         aria-pressed={form.mode === value}
                         onClick={() => switchMode(value)}
                         className={cn(
-                          "rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          form.mode === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                          "rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600",
+                          form.mode === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
                         )}
                       >
                         {label}

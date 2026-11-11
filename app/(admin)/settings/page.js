@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Account, data and app information." />
+      <PageHeader eyebrow="Workspace" title="Settings" description="Account, data and app information." />
       <div className="grid max-w-3xl gap-4">
         <Card>
           <CardHeader>

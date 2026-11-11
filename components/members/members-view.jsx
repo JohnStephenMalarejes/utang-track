@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { Pagination } from "@/components/layout/pagination";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
+import { Avatar } from "@/components/layout/avatar";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
 import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
@@ -57,7 +58,7 @@ export function MembersView({ ledger, initialOpen = false }) {
 
   return (
     <>
-      <PageHeader title="Members" description="The people you share expenses with.">
+      <PageHeader eyebrow="People" title="Members" description="The people you share expenses with.">
         {filtered.length > 0 && (
           <PdfExportButton
             filename={`utang-tracker-members-${todayISO()}.pdf`}
@@ -124,10 +125,13 @@ export function MembersView({ ledger, initialOpen = false }) {
                   {rows.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell>
-                        <Link href={`/members/${m.id}`} className="font-medium hover:text-accent-strong hover:underline">
-                          {m.name}
+                        <Link href={`/members/${m.id}`} className="group flex items-center gap-3">
+                          <Avatar name={m.name} id={m.id} />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium group-hover:underline group-hover:underline-offset-4">{m.name}</span>
+                            {m.contact && <span className="block truncate text-[12px] text-muted-foreground">{m.contact}</span>}
+                          </span>
                         </Link>
-                        {m.contact && <p className="text-xs text-muted-foreground">{m.contact}</p>}
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground lg:table-cell">{formatDate(m.createdAt?.slice(0, 10))}</TableCell>
                       <TableCell className="hidden text-right tabular sm:table-cell">{formatPHP(m.assignedCents)}</TableCell>

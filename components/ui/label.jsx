@@ -5,7 +5,7 @@ import * as LabelPrimitive from "@radix-ui/react-label";
 import { cn } from "@/lib/utils";
 
 const Label = React.forwardRef(({ className, ...props }, ref) => (
-  <LabelPrimitive.Root ref={ref} className={cn("text-[13px] font-medium leading-none peer-disabled:opacity-70", className)} {...props} />
+  <LabelPrimitive.Root ref={ref} className={cn("text-[13px] font-medium leading-none text-slate-800 peer-disabled:opacity-70", className)} {...props} />
 ));
 Label.displayName = "Label";
 
@@ -16,11 +16,11 @@ function Field({ label, htmlFor, hint, error, className, children }) {
       {label && <Label htmlFor={htmlFor}>{label}</Label>}
       {children}
       {error ? (
-        <p className="text-xs text-destructive" role="alert">
+        <p className="text-xs font-medium text-red-600" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs text-slate-500">{hint}</p>
       ) : null}
     </div>
   );

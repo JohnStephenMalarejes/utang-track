@@ -14,21 +14,17 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
+import { Kpi, KpiStrip, Meter } from "@/components/layout/kpi";
+import { Avatar } from "@/components/layout/avatar";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
 import { buildMemberStatementPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
 
 function Stat({ label, value, children }) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <p className="text-[13px] text-muted-foreground">{label}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <p className="text-2xl font-semibold tracking-tight tabular">{value}</p>
-          {children}
-        </div>
-      </CardContent>
-    </Card>
+    <Kpi label={label} value={value}>
+      {children}
+    </Kpi>
   );
 }
 
@@ -48,14 +44,28 @@ export function MemberDetail({ ledger, memberId }) {
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" className="-ml-3 mb-2">
+      <Button asChild variant="ghost" size="sm" className="-ml-2.5 mb-3 lg:hidden">
         <Link href="/members">
           <ArrowLeft /> Members
         </Link>
       </Button>
 
-      <PageHeader title={member.name} description={[member.contact, member.notes].filter(Boolean).join(" — ") || `Added ${formatDate(member.createdAt?.slice(0, 10))}`}>
+      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar name={member.name} id={member.id} size="lg" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <h1 className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em]">{member.name}</h1>
+              <StatusBadge status={member.status} />
+            </div>
+            <p className="mt-1 truncate text-[13.5px] text-muted-foreground">
+              {[member.contact, member.notes].filter(Boolean).join(" · ") || `Member since ${formatDate(member.createdAt?.slice(0, 10))}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
         <PdfExportButton
+          label="Statement"
           filename={`statement-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "member"}-${todayISO()}.pdf`}
           shareTitle={`Statement for ${member.name}`}
           getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
@@ -79,18 +89,23 @@ export function MemberDetail({ ledger, memberId }) {
             </Button>
           </>
         )}
-      </PageHeader>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Total assigned" value={formatPHP(member.assignedCents)} />
-        <Stat label="Total paid" value={formatPHP(member.paidCents)} />
-        <Stat label={member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding balance"} value={formatPHP(Math.abs(member.balanceCents))} />
-        <Stat label="Status" value="">
-          <StatusBadge status={member.status} />
-        </Stat>
+        </div>
       </div>
 
-      <Card className="mt-8">
+      <KpiStrip cols={3}>
+        <Stat label="Assigned" value={formatPHP(member.assignedCents)} />
+        <Stat label="Paid back" value={formatPHP(member.paidCents)}>
+          <div className="mt-1 flex items-center gap-2">
+            <Meter value={member.assignedCents > 0 ? (member.paidCents / member.assignedCents) * 100 : 0} tone="bg-success" className="h-1" />
+            <span className="tabular text-[11px] text-muted-foreground">
+              {member.assignedCents > 0 ? Math.min(100, Math.round((member.paidCents / member.assignedCents) * 100)) : 0}%
+            </span>
+          </div>
+        </Stat>
+        <Stat label={member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding"} value={formatPHP(Math.abs(member.balanceCents))} />
+      </KpiStrip>
+
+      <Card className="mt-6">
         <CardHeader>
           <CardTitle>Expense history</CardTitle>
           <CardDescription>Every expense {member.name} took part in</CardDescription>

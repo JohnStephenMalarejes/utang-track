@@ -1,15 +1,15 @@
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap", {
+const badgeVariants = cva("inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11.5px] font-medium leading-none", {
   variants: {
     variant: {
-      default: "border-transparent bg-primary text-primary-foreground",
-      outline: "border-border bg-card text-muted-foreground",
-      success: "border-transparent bg-success-soft text-success",
-      warning: "border-transparent bg-warning-soft text-warning",
-      danger: "border-transparent bg-destructive/10 text-destructive",
-      muted: "border-transparent bg-muted text-muted-foreground",
+      default: "border-transparent bg-slate-900 text-white",
+      outline: "border-slate-300 bg-white text-slate-700",
+      success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      warning: "border-amber-200 bg-amber-50 text-amber-800",
+      danger: "border-red-200 bg-red-50 text-red-700",
+      muted: "border-slate-200 bg-slate-100 text-slate-700",
     },
   },
   defaultVariants: { variant: "default" },
