@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCheck, Pencil, Plus, Receipt, Wallet } from "lucide-react";
+import { CheckCheck, HandCoins, Pencil, Plus, Receipt, Wallet } from "lucide-react";
 import { settleMember } from "@/app/actions/payments";
 import { useServerAction } from "@/hooks/use-server-action";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,18 @@ import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
 import { Kpi, KpiStrip, Meter } from "@/components/layout/kpi";
 import { Avatar } from "@/components/layout/avatar";
+import {
+  BigMoney,
+  CategoryGlyph,
+  IconButton,
+  ListGroup,
+  ListRow,
+  MobileEmpty,
+  SplitBar,
+  StatusText,
+  UnderlineTabs,
+  shortDate,
+} from "@/components/layout/mobile";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
 import { buildMemberStatementPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
@@ -41,164 +53,207 @@ export function MemberDetail({ ledger, memberId }) {
   const [settleOpen, setSettleOpen] = useState(false);
   const { pending, run } = useServerAction();
 
+  const paidPct = member.assignedCents > 0 ? Math.min(100, (member.paidCents / member.assignedCents) * 100) : 100;
+  const statementFilename = `statement-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "member"}-${todayISO()}.pdf`;
+
   return (
     <>
-      <div className="mb-5 flex flex-col gap-3.5 sm:mb-7 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3.5 sm:gap-4">
-          <Avatar name={member.name} id={member.id} size="lg" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-[20px] font-semibold leading-tight tracking-[-0.02em] sm:text-[22px]">{member.name}</h1>
-              <StatusBadge status={member.status} />
+      {/* ==================== MOBILE SCREEN (< md) ==================== */}
+      <div className="space-y-6 md:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar name={member.name} id={member.id} size="lg" />
+            <div className="min-w-0">
+              <h1 className="truncate text-[22px] font-semibold leading-tight tracking-[-0.025em] text-ink">{member.name}</h1>
+              <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
+                {[member.contact, member.notes].filter(Boolean).join(" · ") || `Since ${formatDate(member.createdAt?.slice(0, 10))}`}
+              </p>
             </div>
-            <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground sm:mt-1 sm:text-[13.5px]">
-              {[member.contact, member.notes].filter(Boolean).join(" · ") || `Member since ${formatDate(member.createdAt?.slice(0, 10))}`}
-            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <PdfExportButton
+              compact
+              label="Statement"
+              filename={statementFilename}
+              shareTitle={`Statement for ${member.name}`}
+              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
+            />
+            <IconButton aria-label={`Edit ${member.name}`} onClick={() => setEditOpen(true)}>
+              <Pencil />
+            </IconButton>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PdfExportButton
-            label="Statement"
-            filename={`statement-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "member"}-${todayISO()}.pdf`}
-            shareTitle={`Statement for ${member.name}`}
-            getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
-          />
-          <Button variant="outline" size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setEditOpen(true)}>
-            <Pencil /> Edit
-          </Button>
+
+        {/* Balance readout + progress */}
+        <div>
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500">
+            {member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding"}
+          </p>
+          <BigMoney cents={Math.abs(member.balanceCents)} size="text-[38px]" className="mt-1" />
+
+          <div className="mt-3.5 rounded-2xl bg-white p-4 shadow-hairline">
+            <SplitBar value={paidPct} />
+            <div className="mt-3 flex items-center justify-between text-[12.5px]">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
+                <span className="text-slate-500">Paid back</span>
+                <span className="tabular font-semibold text-ink">{formatPHP(member.paidCents)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Assigned </span>
+                <span className="tabular font-semibold text-ink">{formatPHP(member.assignedCents)}</span>
+              </div>
+            </div>
+          </div>
+
           {hasOutstanding && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="sm:h-9 sm:px-3.5"
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setSettleOpen(true)}
+                className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white"
+              >
+                <CheckCheck className="h-4 w-4 text-mint" strokeWidth={2.2} />
+                Settle all
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setPayShare(null);
                   setPayOpen(true);
                 }}
+                className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-[14px] font-semibold text-ink shadow-hairline"
               >
-                <Plus /> Record payment
-              </Button>
-              <Button size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setSettleOpen(true)}>
-                <CheckCheck /> Settle all
-              </Button>
-            </>
+                <HandCoins className="h-4 w-4 text-ink-muted" strokeWidth={1.9} />
+                Record payment
+              </button>
+            </div>
           )}
         </div>
-      </div>
 
-      <KpiStrip cols={3}>
-        <Stat label="Assigned" value={formatPHP(member.assignedCents)} />
-        <Stat label="Paid back" value={formatPHP(member.paidCents)}>
-          <div className="mt-1 flex items-center gap-2">
-            <Meter value={member.assignedCents > 0 ? (member.paidCents / member.assignedCents) * 100 : 0} tone="bg-success" className="h-1" />
-            <span className="tabular text-[11px] text-muted-foreground">
-              {member.assignedCents > 0 ? Math.min(100, Math.round((member.paidCents / member.assignedCents) * 100)) : 0}%
-            </span>
-          </div>
-        </Stat>
-        <Stat label={member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding"} value={formatPHP(Math.abs(member.balanceCents))} />
-      </KpiStrip>
-
-      {/* ==================== MOBILE SCREEN (< md) ==================== */}
-      <div className="mt-4 space-y-3 md:hidden">
-        <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Member records">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileTab === "expenses"}
-            onClick={() => setMobileTab("expenses")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold transition-all ${
-              mobileTab === "expenses" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Receipt className="h-3.5 w-3.5" />
-            Expenses ({shares.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileTab === "payments"}
-            onClick={() => setMobileTab("payments")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold transition-all ${
-              mobileTab === "payments" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Wallet className="h-3.5 w-3.5" />
-            Payments ({payments.length})
-          </button>
-        </div>
+        <UnderlineTabs
+          label="Member records"
+          tabs={[
+            { id: "expenses", label: "Expenses", count: shares.length },
+            { id: "payments", label: "Payments", count: payments.length },
+          ]}
+          value={mobileTab}
+          onChange={setMobileTab}
+        />
 
         {mobileTab === "expenses" && (
-          <div className="space-y-2.5">
+          <ListGroup>
             {shares.length === 0 ? (
-              <Card>
-                <EmptyState icon={Receipt} title="No expenses yet" description={`Expenses that include ${member.name} will be listed here.`} />
-              </Card>
+              <MobileEmpty icon={Receipt} title="No expenses yet" description={`Bills that include ${member.name} will show up here.`} />
             ) : (
               shares.map((s) => (
-                <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-[14px] font-semibold text-slate-900">{s.expenseDescription}</p>
-                      <p className="mt-0.5 text-[12px] text-slate-500">
-                        {formatDate(s.expenseDate)} · <span className="font-medium text-slate-700">{s.expenseCategory}</span>
-                      </p>
-                      {s.isPayer && <p className="mt-1 text-[11px] text-slate-500">Paid the bill, so this share isn't owed</p>}
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="tabular text-[15px] font-bold text-slate-900">{formatPHP(Math.max(s.remainingCents, 0))}</p>
-                      <p className="tabular text-[11px] text-slate-500">share {formatPHP(s.amountCents)}</p>
-                    </div>
+                <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                  <CategoryGlyph category={s.expenseCategory} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14.5px] font-medium text-ink">{s.expenseDescription}</p>
+                    <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
+                      {shortDate(s.expenseDate)} · share {formatPHP(s.amountCents)}
+                      {s.isPayer ? " · paid the bill" : ""}
+                    </p>
                   </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                    <StatusBadge status={s.status} />
-                    {s.remainingCents > 0 && !s.isPayer && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-3 text-[12px]"
-                        onClick={() => {
-                          setPayShare(s.id);
-                          setPayOpen(true);
-                        }}
-                      >
-                        Pay
-                      </Button>
-                    )}
+                  <div className="shrink-0 text-right">
+                    <p className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(Math.max(s.remainingCents, 0))}</p>
+                    <StatusText status={s.status} className="mt-0.5 justify-end" />
                   </div>
+                  {s.remainingCents > 0 && !s.isPayer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayShare(s.id);
+                        setPayOpen(true);
+                      }}
+                      className="press shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-[12px] font-semibold text-ink"
+                    >
+                      Pay
+                    </button>
+                  )}
                 </div>
               ))
             )}
-          </div>
+          </ListGroup>
         )}
 
         {mobileTab === "payments" && (
-          <div className="space-y-2.5">
+          <ListGroup>
             {payments.length === 0 ? (
-              <Card>
-                <EmptyState icon={Wallet} title="No payments yet" description="Payments will appear here after you record them." />
-              </Card>
+              <MobileEmpty icon={Wallet} title="No payments yet" description="Payments will appear here after you record them." />
             ) : (
               payments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-semibold text-slate-900">{p.expenseDescription}</p>
-                    <p className="mt-0.5 text-[12px] text-slate-500">
-                      {formatDate(p.date)}
-                      {p.notes ? ` · ${p.notes}` : ""}
-                    </p>
-                  </div>
-                  <p className="tabular shrink-0 text-[15px] font-bold text-emerald-700">+{formatPHP(p.amountCents)}</p>
-                </div>
+                <ListRow
+                  key={p.id}
+                  title={p.expenseDescription}
+                  subtitle={`${shortDate(p.date)}${p.notes ? ` · “${p.notes}”` : ""}`}
+                  trailing={<span className="tabular shrink-0 text-[14.5px] font-semibold text-mint-deep">+{formatPHP(p.amountCents)}</span>}
+                />
               ))
             )}
-          </div>
+          </ListGroup>
         )}
       </div>
 
       {/* ==================== DESKTOP VIEW (md+) ==================== */}
       <div className="hidden md:block">
+        <div className="mb-7 flex flex-row items-center justify-between gap-3.5">
+          <div className="flex min-w-0 items-center gap-4">
+            <Avatar name={member.name} id={member.id} size="lg" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em]">{member.name}</h1>
+                <StatusBadge status={member.status} />
+              </div>
+              <p className="mt-1 truncate text-[13.5px] text-muted-foreground">
+                {[member.contact, member.notes].filter(Boolean).join(" · ") || `Member since ${formatDate(member.createdAt?.slice(0, 10))}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PdfExportButton
+              label="Statement"
+              filename={statementFilename}
+              shareTitle={`Statement for ${member.name}`}
+              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
+            />
+            <Button variant="outline" size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setEditOpen(true)}>
+              <Pencil /> Edit
+            </Button>
+            {hasOutstanding && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="sm:h-9 sm:px-3.5"
+                  onClick={() => {
+                    setPayShare(null);
+                    setPayOpen(true);
+                  }}
+                >
+                  <Plus /> Record payment
+                </Button>
+                <Button size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setSettleOpen(true)}>
+                  <CheckCheck /> Settle all
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <KpiStrip cols={3}>
+          <Stat label="Assigned" value={formatPHP(member.assignedCents)} />
+          <Stat label="Paid back" value={formatPHP(member.paidCents)}>
+            <div className="mt-1 flex items-center gap-2">
+              <Meter value={member.assignedCents > 0 ? (member.paidCents / member.assignedCents) * 100 : 0} tone="bg-success" className="h-1" />
+              <span className="tabular text-[11px] text-muted-foreground">
+                {member.assignedCents > 0 ? Math.min(100, Math.round((member.paidCents / member.assignedCents) * 100)) : 0}%
+              </span>
+            </div>
+          </Stat>
+          <Stat label={member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding"} value={formatPHP(Math.abs(member.balanceCents))} />
+        </KpiStrip>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Expense history</CardTitle>

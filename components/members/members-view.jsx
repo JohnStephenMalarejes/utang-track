@@ -17,7 +17,16 @@ import { StatusBadge } from "@/components/layout/status-badge";
 import { Pagination } from "@/components/layout/pagination";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
 import { Avatar } from "@/components/layout/avatar";
-import { Meter } from "@/components/layout/kpi";
+import {
+  ActionSheet,
+  Amount,
+  IconButton,
+  ListGroup,
+  MiniMeter,
+  MobileEmpty,
+  MoreButton,
+  SearchField,
+} from "@/components/layout/mobile";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
 import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
@@ -29,6 +38,7 @@ export function MembersView({ ledger, initialOpen = false }) {
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
   const [toDelete, setToDelete] = useState(null);
+  const [menuMember, setMenuMember] = useState(null);
   const { pending, run } = useServerAction();
 
   const filtered = useMemo(() => {
@@ -59,7 +69,41 @@ export function MembersView({ ledger, initialOpen = false }) {
 
   return (
     <>
-      <PageHeader eyebrow="People" title="Members" description="The people you share expenses with.">
+      <PageHeader
+        eyebrow="People"
+        title="Members"
+        description="The people you share expenses with."
+        mobileSubtitle={
+          members.length > 0
+            ? `${members.length} ${members.length === 1 ? "person" : "people"} · ${formatPHP(ledger.totals.outstandingCents)} owed`
+            : "People you split bills with"
+        }
+        mobileActions={
+          <>
+            {filtered.length > 0 && (
+              <PdfExportButton
+                compact
+                label="Export balances"
+                filename={`utang-tracker-members-${todayISO()}.pdf`}
+                shareTitle="Utang Tracker Member Balances"
+                getPdfBytes={() =>
+                  buildLedgerPdf({
+                    title: "Member Balances",
+                    members: filtered,
+                    expenses: ledger.expenses,
+                    payments: ledger.payments,
+                    includeExpenses: false,
+                    includePayments: false,
+                  })
+                }
+              />
+            )}
+            <IconButton tone="solid" aria-label="Add member" onClick={() => openForm()}>
+              <Plus />
+            </IconButton>
+          </>
+        }
+      >
         {filtered.length > 0 && (
           <PdfExportButton
             filename={`utang-tracker-members-${todayISO()}.pdf`}
@@ -92,74 +136,53 @@ export function MembersView({ ledger, initialOpen = false }) {
       ) : (
         <>
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
-          <div className="space-y-3 md:hidden">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search members..."
-                aria-label="Search members"
-                className="h-10 rounded-xl bg-white pl-9"
-              />
-            </div>
+          <div className="space-y-4 md:hidden">
+            <SearchField
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search people…"
+              aria-label="Search members"
+            />
 
             {filtered.length === 0 ? (
-              <Card>
-                <EmptyState icon={Search} title="No matching members" description="Try a different name or clear the search." />
-              </Card>
+              <ListGroup>
+                <MobileEmpty icon={Search} title="No matching people" description="Try a different name or clear the search." />
+              </ListGroup>
             ) : (
-              <div className="space-y-2.5">
-                {rows.map((m) => {
-                  const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
-                  return (
-                    <div key={m.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                      <div className="flex items-start justify-between gap-3">
-                        <Link href={`/members/${m.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="space-y-4">
+                <ListGroup>
+                  {rows.map((m) => {
+                    const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
+                    return (
+                      <div key={m.id} className="flex items-center gap-2 px-4 py-3">
+                        <Link href={`/members/${m.id}`} className="tap -my-3 -ml-4 flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
                           <Avatar name={m.name} id={m.id} />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="truncate text-[14.5px] font-semibold text-slate-900">{m.name}</p>
-                              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                            </div>
-                            <p className="truncate text-[12px] text-slate-500">
-                              {m.contact || `${m.expenseCount} ${m.expenseCount === 1 ? "expense" : "expenses"}`}
+                            <p className="truncate text-[14.5px] font-medium text-ink">{m.name}</p>
+                            <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
+                              {m.contact || `${m.expenseCount} ${m.expenseCount === 1 ? "bill" : "bills"}`}
+                              {m.assignedCents > 0 ? ` · ${formatPHP(m.paidCents)} paid` : ""}
                             </p>
+                            {m.assignedCents > 0 && <MiniMeter value={pct} className="mt-2" />}
                           </div>
+                          <Amount
+                            value={formatPHP(Math.max(m.balanceCents, 0))}
+                            caption={m.balanceCents > 0 ? "owes" : m.expenseCount > 0 ? "settled" : "no bills"}
+                            tone={m.balanceCents > 0 ? "text-ink" : "text-slate-400"}
+                          />
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
                         </Link>
-                        <div className="shrink-0 text-right">
-                          <p className="tabular text-[15px] font-bold text-slate-900">{formatPHP(m.balanceCents)}</p>
-                          <p className="text-[11px] text-slate-500">outstanding</p>
-                        </div>
+                        <MoreButton label={`Actions for ${m.name}`} onClick={() => setMenuMember(m)} />
                       </div>
-
-                      <div className="mt-3 flex items-center gap-3">
-                        <Meter value={pct} tone={pct >= 100 ? "bg-emerald-600" : "bg-teal-600"} className="h-1.5" />
-                        <span className="tabular shrink-0 text-[11px] text-slate-500">
-                          {formatPHP(m.paidCents)} / {formatPHP(m.assignedCents)}
-                        </span>
-                      </div>
-
-                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
-                        <StatusBadge status={m.status} />
-                        <div className="flex items-center gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${m.name}`} onClick={() => openForm(m)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" aria-label={`Delete ${m.name}`} onClick={() => askDelete(m)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <Card className="overflow-hidden">
+                    );
+                  })}
+                </ListGroup>
+                <ListGroup>
                   <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-                </Card>
+                </ListGroup>
               </div>
             )}
           </div>
@@ -238,6 +261,26 @@ export function MembersView({ ledger, initialOpen = false }) {
       )}
 
       <MemberFormDialog open={formOpen} onOpenChange={setFormOpen} member={editing} />
+
+      <ActionSheet
+        open={Boolean(menuMember)}
+        onOpenChange={(o) => !o && setMenuMember(null)}
+        title={menuMember?.name}
+        description={menuMember?.contact || `${menuMember?.expenseCount ?? 0} bills · ${formatPHP(menuMember?.balanceCents ?? 0)} outstanding`}
+        actions={[
+          menuMember && {
+            label: "Edit member",
+            icon: Pencil,
+            onSelect: () => openForm(menuMember),
+          },
+          menuMember && {
+            label: "Delete member",
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => askDelete(menuMember),
+          },
+        ]}
+      />
 
       <ConfirmDialog
         open={Boolean(toDelete)}

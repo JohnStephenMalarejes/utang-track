@@ -38,9 +38,9 @@ export default async function AdminLayout({ children }) {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 lg:pl-60">
+    <div className="min-h-dvh bg-canvas lg:bg-slate-50 lg:pl-60">
       <Sidebar email={user.email} />
-      <main className="mx-auto w-full max-w-[1200px] px-3.5 pb-24 pt-3.5 sm:px-6 sm:pt-5 lg:px-8 lg:py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-5 sm:px-6 lg:px-8 lg:py-8">{children}</main>
     </div>
   );
 }

@@ -21,10 +21,13 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0F172A",
+  themeColor: "#F2F3F5",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {
@@ -34,9 +37,10 @@ export default function RootLayout({ children }) {
         <PwaRegister />
         {children}
         <Toaster
-          position="bottom-right"
+          position="top-center"
           closeButton
-          toastOptions={{ classNames: { toast: "font-sans !rounded-lg !border-border !shadow-pop", title: "!text-[13px] !font-medium" } }}
+          offset={16}
+          toastOptions={{ classNames: { toast: "font-sans !rounded-xl !border-border !shadow-pop", title: "!text-[13px] !font-medium" } }}
         />
       </body>
     </html>

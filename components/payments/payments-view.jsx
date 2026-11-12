@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCheck, Clock, History, Pencil, Plus, Search, Trash2, Wallet } from "lucide-react";
+import { CheckCheck, HandCoins, Pencil, Plus, Search, Trash2, Wallet } from "lucide-react";
 import { deletePayment, settleShare } from "@/app/actions/payments";
 import { useServerAction } from "@/hooks/use-server-action";
 import { Button } from "@/components/ui/button";
@@ -15,20 +15,36 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { Pagination } from "@/components/layout/pagination";
 import { Avatar } from "@/components/layout/avatar";
+import {
+  ActionSheet,
+  ChipRow,
+  IconButton,
+  ListGroup,
+  ListRow,
+  MobileEmpty,
+  SearchField,
+  SectionLabel,
+  UnderlineTabs,
+  dayLabel,
+  groupByDate,
+  shortDate,
+} from "@/components/layout/mobile";
 import { PaymentFormDialog } from "./payment-form-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
-import { formatDate, formatPHP, todayISO } from "@/lib/utils";
+import { formatDate, formatPHP, sumCents, todayISO } from "@/lib/utils";
 
-export function PaymentsView({ ledger }) {
+export function PaymentsView({ ledger, initialOpen = false }) {
   const [memberFilter, setMemberFilter] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [mobileTab, setMobileTab] = useState("unpaid");
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
   const [preset, setPreset] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const [toSettle, setToSettle] = useState(null);
+  const [shareMenu, setShareMenu] = useState(null);
+  const [paymentMenu, setPaymentMenu] = useState(null);
   const { pending, run } = useServerAction();
 
   const outstanding = useMemo(
@@ -51,6 +67,12 @@ export function PaymentsView({ ledger }) {
   const pageCount = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const rows = history.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const groupedHistory = useMemo(() => groupByDate(rows, (p) => p.date), [rows]);
+  const outstandingTotal = useMemo(() => sumCents(outstanding.map((s) => s.remainingCents)), [outstanding]);
+  const memberChips = useMemo(
+    () => [{ value: "", label: "All people" }, ...ledger.members.map((m) => ({ value: m.id, label: m.name }))],
+    [ledger.members]
+  );
 
   function openForm({ payment = null, shareId = null } = {}) {
     setEditing(payment);
@@ -60,14 +82,28 @@ export function PaymentsView({ ledger }) {
 
   return (
     <>
-      <PageHeader eyebrow="Ledger" title="Payments" description="Record what people have paid back. Balances update immediately.">
+      <PageHeader
+        eyebrow="Ledger"
+        title="Payments"
+        description="Record what people have paid back. Balances update immediately."
+        mobileSubtitle={
+          outstanding.length > 0
+            ? `${outstanding.length} unpaid ${outstanding.length === 1 ? "share" : "shares"} · ${formatPHP(outstandingTotal)}`
+            : "All shares settled"
+        }
+        mobileActions={
+          <IconButton tone="solid" aria-label="Record payment" onClick={() => openForm()}>
+            <Plus />
+          </IconButton>
+        }
+      >
         <Button onClick={() => openForm()}>
           <Plus /> Record payment
         </Button>
       </PageHeader>
 
       {ledger.members.length > 0 && (
-        <div className="mb-4 sm:max-w-xs">
+        <div className="mb-4 hidden sm:max-w-xs md:block">
           <Select
             aria-label="Filter by member"
             value={memberFilter}
@@ -88,135 +124,123 @@ export function PaymentsView({ ledger }) {
       )}
 
       {/* ==================== MOBILE SCREEN (< md) ==================== */}
-      <div className="space-y-3 md:hidden">
-        {/* Segmented Screen Switcher */}
-        <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Payment screens">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileTab === "unpaid"}
-            onClick={() => setMobileTab("unpaid")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold transition-all ${
-              mobileTab === "unpaid" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Unpaid ({outstanding.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileTab === "history"}
-            onClick={() => setMobileTab("history")}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold transition-all ${
-              mobileTab === "history" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <History className="h-3.5 w-3.5" />
-            History ({history.length})
-          </button>
-        </div>
+      <div className="space-y-4 md:hidden">
+        <UnderlineTabs
+          label="Payment views"
+          tabs={[
+            { id: "unpaid", label: "To collect", count: outstanding.length },
+            { id: "history", label: "History", count: history.length },
+          ]}
+          value={mobileTab}
+          onChange={setMobileTab}
+        />
+
+        {ledger.members.length > 0 && (
+          <ChipRow
+            label="Filter by person"
+            options={memberChips}
+            value={memberFilter}
+            onChange={(val) => {
+              setMemberFilter(val);
+              setPage(1);
+            }}
+          />
+        )}
 
         {/* Mobile Tab 1: Unpaid Shares */}
         {mobileTab === "unpaid" && (
-          <div className="space-y-2.5">
+          <ListGroup>
             {outstanding.length === 0 ? (
-              <Card>
-                <EmptyState icon={CheckCheck} title="All caught up" description="No unpaid expense shares right now." />
-              </Card>
+              <MobileEmpty icon={CheckCheck} title="All caught up" description="No unpaid expense shares right now." />
             ) : (
               outstanding.map((s) => (
-                <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <Avatar name={s.memberName} id={s.memberId} />
-                      <div className="min-w-0">
-                        <p className="truncate text-[14px] font-semibold text-slate-900">{s.memberName}</p>
-                        <p className="truncate text-[12px] text-slate-500">
-                          {s.expenseDescription} · {formatDate(s.expenseDate)}
-                        </p>
-                      </div>
+                <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setShareMenu(s)}
+                    className="tap -my-3 -ml-4 flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left"
+                  >
+                    <Avatar name={s.memberName} id={s.memberId} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14.5px] font-medium text-ink">{s.memberName}</p>
+                      <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
+                        {s.expenseDescription} · {shortDate(s.expenseDate)}
+                      </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="tabular text-[15px] font-bold text-slate-900">{formatPHP(s.remainingCents)}</p>
-                      <p className="tabular text-[11px] text-slate-500">of {formatPHP(s.owedCents)}</p>
+                      <p className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(s.remainingCents)}</p>
+                      <p className="tabular text-[11px] text-slate-400">
+                        {s.paidCents > 0 ? `of ${formatPHP(s.owedCents)}` : "unpaid"}
+                      </p>
                     </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-                    <StatusBadge status={s.status} />
-                    <div className="flex items-center gap-1.5">
-                      <Button size="sm" variant="outline" className="h-8 px-3 text-[12px]" onClick={() => openForm({ shareId: s.id })}>
-                        Pay partial
-                      </Button>
-                      <Button size="sm" className="h-8 px-3 text-[12px]" onClick={() => setToSettle(s)}>
-                        <CheckCheck className="h-3.5 w-3.5" /> Settle
-                      </Button>
-                    </div>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setToSettle(s)}
+                    aria-label={`Settle ${s.memberName}'s ${s.expenseDescription}`}
+                    className="press shrink-0 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white"
+                  >
+                    Settle
+                  </button>
                 </div>
               ))
             )}
-          </div>
+          </ListGroup>
         )}
 
         {/* Mobile Tab 2: Payment History */}
         {mobileTab === "history" && (
-          <div className="space-y-2.5">
+          <div className="space-y-4">
             {ledger.payments.length > 0 && (
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Search payments..."
-                  aria-label="Search payments"
-                  className="h-10 rounded-xl bg-white pl-9"
-                />
-              </div>
+              <SearchField
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search payments…"
+                aria-label="Search payments"
+              />
             )}
 
             {ledger.payments.length === 0 ? (
-              <Card>
-                <EmptyState icon={Wallet} title="No payments yet" description="Payments will appear here after they are recorded." />
-              </Card>
+              <ListGroup>
+                <MobileEmpty icon={Wallet} title="No payments yet" description="Payments will appear here once someone pays you back." />
+              </ListGroup>
             ) : history.length === 0 ? (
-              <Card>
-                <EmptyState icon={Search} title="No matching payments" description="Try a different member or search term." />
-              </Card>
+              <ListGroup>
+                <MobileEmpty icon={Search} title="No matching payments" description="Try another person or search term." />
+              </ListGroup>
             ) : (
-              <>
-                {rows.map((p) => (
-                  <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <Avatar name={p.memberName} id={p.memberId} />
-                        <div className="min-w-0">
-                          <p className="truncate text-[14px] font-semibold text-slate-900">{p.memberName}</p>
-                          <p className="truncate text-[12px] text-slate-500">
-                            {p.expenseDescription} · {formatDate(p.date)}
-                          </p>
-                          {p.notes && <p className="mt-0.5 truncate text-[11.5px] text-slate-500">“{p.notes}”</p>}
-                        </div>
-                      </div>
-                      <p className="tabular shrink-0 text-[15px] font-bold text-emerald-700">+{formatPHP(p.amountCents)}</p>
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-slate-100 pt-2">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Edit payment" onClick={() => openForm({ payment: p })}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" aria-label="Delete payment" onClick={() => setToDelete(p)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+              <div className="space-y-5">
+                {groupedHistory.map(([date, items]) => (
+                  <section key={date} aria-label={dayLabel(date)}>
+                    <SectionLabel
+                      action={<span className="tabular text-[12px] font-medium text-slate-400">+{formatPHP(sumCents(items.map((i) => i.amountCents)))}</span>}
+                    >
+                      {dayLabel(date)}
+                    </SectionLabel>
+                    <ListGroup>
+                      {items.map((p) => (
+                        <ListRow
+                          key={p.id}
+                          as="button"
+                          type="button"
+                          onClick={() => setPaymentMenu(p)}
+                          className="tap"
+                          leading={<Avatar name={p.memberName} id={p.memberId} />}
+                          title={p.memberName}
+                          subtitle={`${p.expenseDescription}${p.notes ? ` · “${p.notes}”` : ""}`}
+                          trailing={<span className="tabular shrink-0 text-[14.5px] font-semibold text-mint-deep">+{formatPHP(p.amountCents)}</span>}
+                        />
+                      ))}
+                    </ListGroup>
+                  </section>
                 ))}
-                <Card className="overflow-hidden">
+                <ListGroup>
                   <Pagination page={safePage} pageSize={PAGE_SIZE} total={history.length} onPageChange={setPage} />
-                </Card>
-              </>
+                </ListGroup>
+              </div>
             )}
           </div>
         )}
@@ -351,6 +375,48 @@ export function PaymentsView({ ledger }) {
       </div>
 
       <PaymentFormDialog open={formOpen} onOpenChange={setFormOpen} ledger={ledger} payment={editing} preset={preset} />
+
+      <ActionSheet
+        open={Boolean(shareMenu)}
+        onOpenChange={(o) => !o && setShareMenu(null)}
+        title={shareMenu ? `${shareMenu.memberName} · ${shareMenu.expenseDescription}` : ""}
+        description={shareMenu ? `${formatPHP(shareMenu.remainingCents)} remaining of ${formatPHP(shareMenu.owedCents)}` : ""}
+        actions={[
+          shareMenu && {
+            label: `Settle ${formatPHP(shareMenu.remainingCents)}`,
+            description: "Mark this share as paid in full today",
+            icon: CheckCheck,
+            primary: true,
+            onSelect: () => setToSettle(shareMenu),
+          },
+          shareMenu && {
+            label: "Record partial payment",
+            description: "Enter a custom amount or date",
+            icon: HandCoins,
+            onSelect: () => openForm({ shareId: shareMenu.id }),
+          },
+        ]}
+      />
+
+      <ActionSheet
+        open={Boolean(paymentMenu)}
+        onOpenChange={(o) => !o && setPaymentMenu(null)}
+        title={paymentMenu ? `${formatPHP(paymentMenu.amountCents)} from ${paymentMenu.memberName}` : ""}
+        description={paymentMenu ? `${paymentMenu.expenseDescription} · ${formatDate(paymentMenu.date)}` : ""}
+        actions={[
+          paymentMenu && {
+            label: "Edit payment",
+            icon: Pencil,
+            onSelect: () => openForm({ payment: paymentMenu }),
+          },
+          paymentMenu && {
+            label: "Delete payment",
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => setToDelete(paymentMenu),
+          },
+        ]}
+      />
 
       <ConfirmDialog
         open={Boolean(toDelete)}

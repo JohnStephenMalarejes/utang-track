@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { FileDown, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ActionSheet, IconButton } from "@/components/layout/mobile";
 
 function triggerPdfDownload(bytes, filename) {
   const blob = new Blob([bytes], { type: "application/pdf" });
@@ -21,8 +22,9 @@ function triggerPdfDownload(bytes, filename) {
  * Renders an "Export PDF" button and, when the browser/device supports native file sharing,
  * a "Share PDF" button so the user can directly send the PDF via Messenger, WhatsApp, Email, etc.
  */
-export function PdfExportButton({ getPdfBytes, filename = "utang-tracker.pdf", shareTitle = "Utang Tracker Statement", label = "Export PDF", size = "default", variant = "outline" }) {
+export function PdfExportButton({ getPdfBytes, filename = "utang-tracker.pdf", shareTitle = "Utang Tracker Statement", label = "Export PDF", size = "default", variant = "outline", compact = false }) {
   const [canShareFiles, setCanShareFiles] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -64,6 +66,26 @@ export function PdfExportButton({ getPdfBytes, filename = "utang-tracker.pdf", s
       if (err?.name === "AbortError") return;
       toast.error(err?.message || "Could not share PDF");
     }
+  }
+
+  if (compact) {
+    return (
+      <>
+        <IconButton aria-label={`${label} options`} onClick={() => setSheetOpen(true)}>
+          <FileDown />
+        </IconButton>
+        <ActionSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          title={shareTitle}
+          description="PDF document"
+          actions={[
+            { label: "Download PDF", description: "Save to this device", icon: FileDown, onSelect: handleDownload },
+            canShareFiles && { label: "Share PDF", description: "Messenger, Viber, email…", icon: Share2, onSelect: handleShare },
+          ]}
+        />
+      </>
+    );
   }
 
   return (

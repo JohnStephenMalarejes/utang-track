@@ -261,8 +261,8 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                   </Button>
                 </div>
 
-                <ul className="divide-y rounded-lg border">
-                  <li className="flex items-center justify-between gap-3 bg-muted/30 px-3 py-2">
+                <ul className="divide-y rounded-xl border border-slate-200 md:rounded-lg">
+                  <li className="flex items-center justify-between gap-3 bg-muted/30 px-3.5 py-2.5">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <Checkbox
                         id="part-user"
@@ -298,7 +298,7 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                     const checked = Boolean(form.selected[m.id]);
                     const cents = shareCents[m.id];
                     return (
-                      <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <li key={m.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                         <div className="flex min-w-0 items-center gap-2.5">
                           <Checkbox id={`part-${m.id}`} checked={checked} onCheckedChange={(v) => toggle(m.id, v === true)} />
                           <label htmlFor={`part-${m.id}`} className="min-w-0 cursor-pointer text-sm">

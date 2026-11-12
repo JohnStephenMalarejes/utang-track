@@ -15,6 +15,18 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
 import { Kpi, KpiStrip } from "@/components/layout/kpi";
+import { Avatar } from "@/components/layout/avatar";
+import {
+  Amount,
+  CategoryGlyph,
+  ListGroup,
+  ListRow,
+  MobileEmpty,
+  SectionLabel,
+  StatusText,
+  UnderlineTabs,
+  shortDate,
+} from "@/components/layout/mobile";
 import { CategoryChart, SettlementChart } from "@/components/dashboard/charts";
 import { categoryTotals, expenseEntries, summarize, total } from "@/lib/calculations/analytics";
 import { statusFor } from "@/lib/calculations/ledger";
@@ -105,7 +117,27 @@ export function ReportsView({ ledger }) {
 
   return (
     <>
-      <PageHeader eyebrow="Insights" title="Reports" description="Summaries, balances and trends for any date range.">
+      <PageHeader
+        eyebrow="Insights"
+        title="Reports"
+        description="Summaries, balances and trends for any date range."
+        mobileSubtitle={`${scoped.length} ${scoped.length === 1 ? "bill" : "bills"} · ${formatPHP(total(entries))} spent`}
+        mobileActions={
+          <PdfExportButton
+            compact
+            label="Export report"
+            filename={`utang-tracker-report-${todayISO()}.pdf`}
+            shareTitle="Utang Tracker Report"
+            getPdfBytes={() =>
+              buildLedgerPdf({
+                members: ledger.members.filter((m) => !memberId || m.id === memberId),
+                expenses: scoped,
+                allExpenses: ledger.expenses,
+              })
+            }
+          />
+        }
+      >
         <PdfExportButton
           filename={`utang-tracker-report-${todayISO()}.pdf`}
           shareTitle="Utang Tracker Report"
@@ -119,8 +151,8 @@ export function ReportsView({ ledger }) {
         />
       </PageHeader>
 
-      <Card className="mb-4 sm:mb-6">
-        <CardContent className="grid grid-cols-2 gap-3 p-3.5 sm:flex sm:flex-wrap sm:items-end sm:p-4">
+      <div className="mb-4 rounded-2xl bg-white p-4 shadow-hairline sm:mb-6 md:rounded-lg md:border md:border-slate-200 md:shadow-card">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
           <label className="space-y-1">
             <span className="eyebrow block">From</span>
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-full sm:w-40" />
@@ -148,8 +180,8 @@ export function ReportsView({ ledger }) {
           <p className="col-span-2 hidden w-full text-xs text-muted-foreground sm:block">
             Dates filter expenses by expense date and payments by payment date. With a member selected, amounts are that member's shares.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {scoped.length === 0 && payments.length === 0 ? (
         <Card>
@@ -161,7 +193,7 @@ export function ReportsView({ ledger }) {
         </Card>
       ) : (
         <>
-          <KpiStrip className="grid-cols-2">
+          <KpiStrip className="grid-cols-2 rounded-2xl border-0 shadow-hairline md:rounded-xl md:border md:border-slate-200 md:shadow-card">
             <Stat label="Total expenses" value={formatPHP(total(entries))} hint={`${scoped.length} ${scoped.length === 1 ? "transaction" : "transactions"}`} />
             <Stat label="Outstanding" value={formatPHP(outstandingCents)} hint="Still owed in range" />
             <Stat label="Settled" value={formatPHP(settledCents)} hint="Paid back in range" />
@@ -169,161 +201,124 @@ export function ReportsView({ ledger }) {
           </KpiStrip>
 
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
-          <div className="mt-4 space-y-3 md:hidden">
-            <div className="grid grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Report sections">
-              {MOBILE_REPORT_TABS.map(({ id, label }) => {
-                const active = mobileTab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setMobileTab(id)}
-                    className={`rounded-lg py-2 text-[11.5px] font-semibold transition-all ${
-                      active ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mt-5 space-y-4 md:hidden">
+            <UnderlineTabs label="Report sections" tabs={MOBILE_REPORT_TABS} value={mobileTab} onChange={setMobileTab} />
 
             {mobileTab === "trends" && (
-              <Card>
-                <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
-                  <div>
-                    <CardTitle>Spending</CardTitle>
-                    <CardDescription>By period</CardDescription>
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-white p-4 shadow-hairline">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-[14px] font-semibold text-ink">Spending</p>
+                      <p className="text-[12px] text-slate-500">Grouped by period</p>
+                    </div>
+                    <div className="inline-flex rounded-full bg-slate-100 p-0.5" role="group" aria-label="Group by">
+                      {GRANULARITY.map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={granularity === value}
+                          onClick={() => setGranularity(value)}
+                          className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
+                            granularity === value ? "bg-white text-ink shadow-xs" : "text-slate-500"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5" role="group" aria-label="Group by">
-                    {GRANULARITY.map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        aria-pressed={granularity === value}
-                        onClick={() => setGranularity(value)}
-                        className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                          granularity === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
                   <div className="h-52">
                     <SpendingBarChartInline data={periods} />
                   </div>
-                  {periods.length > 0 && (
-                    <div className="divide-y rounded-lg border">
+                </div>
+
+                {periods.length > 0 && (
+                  <section aria-label="Period totals">
+                    <SectionLabel>By period</SectionLabel>
+                    <ListGroup>
                       {[...periods].reverse().map((r) => (
-                        <div key={r.key} className="flex items-center justify-between px-3.5 py-2.5 text-[13px]">
-                          <div>
-                            <p className="font-medium text-slate-900">{r.label}</p>
-                            <p className="text-[11px] text-slate-500">
-                              {r.count} {r.count === 1 ? "transaction" : "transactions"}
-                            </p>
-                          </div>
-                          <p className="tabular font-semibold text-slate-900">{formatPHP(r.totalCents)}</p>
-                        </div>
+                        <ListRow
+                          key={r.key}
+                          title={r.label}
+                          subtitle={`${r.count} ${r.count === 1 ? "bill" : "bills"}`}
+                          trailing={<span className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(r.totalCents)}</span>}
+                        />
                       ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    </ListGroup>
+                  </section>
+                )}
+              </div>
             )}
 
             {mobileTab === "balances" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <SettlementChart settledCents={settledCents} outstandingCents={outstandingCents} description="For records in this report" />
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Member balances</CardTitle>
-                    <CardDescription>Assigned minus paid in this range</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
+                <section aria-label="Member balances">
+                  <SectionLabel>People</SectionLabel>
+                  <ListGroup>
                     {balances.length === 0 ? (
-                      <EmptyState title="No balances in this range" className="py-8" />
+                      <MobileEmpty title="No balances in this range" />
                     ) : (
-                      <div className="divide-y">
-                        {balances.map((b) => (
-                          <Link
-                            key={b.id}
-                            href={`/members/${b.id}`}
-                            className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                          >
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="truncate text-[14px] font-semibold text-slate-900">{b.name}</p>
-                                <StatusBadge status={b.status} />
-                              </div>
-                              <p className="tabular mt-0.5 text-[11.5px] text-slate-500">
-                                Paid {formatPHP(b.paid)} of {formatPHP(b.assigned)}
-                              </p>
+                      balances.map((b) => (
+                        <ListRow
+                          key={b.id}
+                          as={Link}
+                          href={`/members/${b.id}`}
+                          className="tap"
+                          leading={<Avatar name={b.name} id={b.id} />}
+                          title={b.name}
+                          subtitle={`Paid ${formatPHP(b.paid)} of ${formatPHP(b.assigned)}`}
+                          trailing={
+                            <div className="text-right">
+                              <div className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(b.balance)}</div>
+                              <StatusText status={b.status} className="mt-0.5 justify-end" />
                             </div>
-                            <p className="tabular shrink-0 text-[14.5px] font-bold text-slate-900">{formatPHP(b.balance)}</p>
-                          </Link>
-                        ))}
-                      </div>
+                          }
+                        />
+                      ))
                     )}
-                  </CardContent>
-                </Card>
+                  </ListGroup>
+                </section>
               </div>
             )}
 
             {mobileTab === "categories" && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <CategoryChart title="Category breakdown" description="Where the money went" data={categories} />
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Category totals</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y">
-                      {categories.map((c) => (
-                        <div key={c.category} className="flex items-center justify-between px-4 py-3 text-[13.5px]">
-                          <span className="font-medium text-slate-900">{c.category}</span>
-                          <div className="text-right">
-                            <p className="tabular font-semibold text-slate-900">{formatPHP(c.totalCents)}</p>
-                            <p className="tabular text-[11px] text-slate-500">{((c.totalCents / (total(entries) || 1)) * 100).toFixed(1)}%</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <section aria-label="Category totals">
+                  <SectionLabel>Totals</SectionLabel>
+                  <ListGroup>
+                    {categories.map((c) => (
+                      <ListRow
+                        key={c.category}
+                        leading={<CategoryGlyph category={c.category} />}
+                        title={c.category}
+                        subtitle={`${((c.totalCents / (total(entries) || 1)) * 100).toFixed(1)}% of spending`}
+                        trailing={<Amount value={formatPHP(c.totalCents)} />}
+                      />
+                    ))}
+                  </ListGroup>
+                </section>
               </div>
             )}
 
             {mobileTab === "payments" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment history</CardTitle>
-                  <CardDescription>{payments.length} in this range</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {payments.length === 0 ? (
-                    <EmptyState title="No payments in this range" description="Payments will appear here after they are recorded." className="py-8" />
-                  ) : (
-                    <div className="divide-y">
-                      {payments.slice(0, 50).map((p) => (
-                        <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-[13.5px] font-semibold text-slate-900">{p.memberName}</p>
-                            <p className="truncate text-[12px] text-slate-500">
-                              {p.expenseDescription} · {formatDate(p.date)}
-                            </p>
-                          </div>
-                          <p className="tabular shrink-0 text-[14px] font-bold text-emerald-700">+{formatPHP(p.amountCents)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <ListGroup>
+                {payments.length === 0 ? (
+                  <MobileEmpty icon={Wallet} title="No payments in this range" description="Payments will appear here after they are recorded." />
+                ) : (
+                  payments.slice(0, 50).map((p) => (
+                    <ListRow
+                      key={p.id}
+                      leading={<Avatar name={p.memberName} id={p.memberId} />}
+                      title={p.memberName}
+                      subtitle={`${p.expenseDescription} · ${shortDate(p.date)}`}
+                      trailing={<span className="tabular shrink-0 text-[14.5px] font-semibold text-mint-deep">+{formatPHP(p.amountCents)}</span>}
+                    />
+                  ))
+                )}
+              </ListGroup>
             )}
           </div>
 

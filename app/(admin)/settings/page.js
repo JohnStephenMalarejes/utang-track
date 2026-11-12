@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/layout/export-button";
+import { ListGroup, ListRow, SectionLabel } from "@/components/layout/mobile";
 
 export const metadata = { title: "Settings" };
 
@@ -13,11 +14,70 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const [ledger, { data }] = await Promise.all([getLedger(), supabase.auth.getUser()]);
   const { totals } = ledger;
+  const email = data.user?.email || "Administrator";
+  const initial = email.trim().charAt(0).toUpperCase();
 
   return (
     <>
-      <PageHeader eyebrow="Workspace" title="Settings" description="Account, data and app information." />
-      <div className="grid max-w-3xl gap-4">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Settings"
+        description="Account, data and app information."
+        mobileSubtitle="Account, backups & app info"
+      />
+
+      {/* ==================== MOBILE SCREEN (< md) ==================== */}
+      <div className="space-y-6 md:hidden">
+        <section aria-label="Account">
+          <SectionLabel>Account</SectionLabel>
+          <ListGroup>
+            <ListRow
+              leading={
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink text-[14px] font-semibold text-mint">
+                  {initial}
+                </span>
+              }
+              title={email}
+              subtitle="Administrator"
+              trailing={
+                <form action={signOut}>
+                  <button
+                    type="submit"
+                    className="press inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-100 px-3.5 text-[12.5px] font-semibold text-ink"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Sign out
+                  </button>
+                </form>
+              }
+            />
+          </ListGroup>
+        </section>
+
+        <section aria-label="Ledger records">
+          <SectionLabel>Ledger</SectionLabel>
+          <ListGroup>
+            <ListRow title="People" trailing={<span className="tabular text-[14.5px] font-semibold text-ink">{totals.memberCount}</span>} />
+            <ListRow title="Expenses" trailing={<span className="tabular text-[14.5px] font-semibold text-ink">{totals.expenseCount}</span>} />
+            <ListRow title="Payments" trailing={<span className="tabular text-[14.5px] font-semibold text-ink">{totals.paymentCount}</span>} />
+            <div className="p-4">
+              <ExportButton ledger={ledger} />
+            </div>
+          </ListGroup>
+        </section>
+
+        <section aria-label="About">
+          <SectionLabel>About</SectionLabel>
+          <ListGroup>
+            <ListRow title="Version" trailing={<span className="tabular text-[13.5px] text-slate-500">1.0.0</span>} />
+            <ListRow title="Currency" trailing={<span className="text-[13.5px] text-slate-500">Philippine peso (₱)</span>} />
+            <ListRow title="Precision" subtitle="All splits and balances are calculated in integer centavos." />
+          </ListGroup>
+        </section>
+      </div>
+
+      {/* ==================== DESKTOP VIEW (md+) ==================== */}
+      <div className="hidden max-w-3xl gap-4 md:grid">
         <Card>
           <CardHeader>
             <CardTitle>Account</CardTitle>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, Plus, Receipt, Users, Wallet } from "lucide-react";
+import { ArrowUpRight, ChevronRight, HandCoins, Plus, Receipt, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
@@ -11,6 +11,20 @@ import { StatusBadge } from "@/components/layout/status-badge";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
 import { Kpi, KpiStrip, Meter } from "@/components/layout/kpi";
 import { Avatar } from "@/components/layout/avatar";
+import {
+  Amount,
+  BigMoney,
+  CategoryGlyph,
+  ListGroup,
+  ListRow,
+  MiniMeter,
+  MobileEmpty,
+  SectionLabel,
+  SplitBar,
+  StatusText,
+  shortDate,
+} from "@/components/layout/mobile";
+import { ExpenseDetailDialog } from "@/components/expenses/expense-detail-dialog";
 import { CategoryChart, SettlementChart, SpendingBarChart } from "./charts";
 import { categoryTotals, expenseEntries, lastDaysSeries, lastMonthsSeries } from "@/lib/calculations/analytics";
 import { buildLedgerPdf, formatDateLong, formatPHP, todayISO } from "@/lib/utils";
@@ -164,15 +178,236 @@ function RecentActivity({ expenses }) {
   );
 }
 
-const MOBILE_SECTIONS = [
-  { id: "balances", label: "Balances", icon: Users },
-  { id: "activity", label: "Recent Bills", icon: Receipt },
-  { id: "spending", label: "Insights", icon: BarChart3 },
-];
+function MobileOverview({ ledger, daily, collectedPct, debtors }) {
+  const { totals, members, expenses } = ledger;
+  const [viewing, setViewing] = useState(null);
+
+  const ranked = useMemo(
+    () => [...members].filter((m) => m.expenseCount > 0).sort((a, b) => b.balanceCents - a.balanceCents),
+    [members]
+  );
+  const recent = useMemo(() => expenses.slice(0, 6), [expenses]);
+  const fourteenDayTotal = useMemo(() => daily.reduce((s, d) => s + d.totalCents, 0), [daily]);
+  const maxDay = useMemo(() => Math.max(...daily.map((d) => d.totalCents), 1), [daily]);
+
+  return (
+    <div className="space-y-7">
+      {/* Editorial balance header — sits directly on the canvas */}
+      <section aria-label="Balance summary">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500">To collect</p>
+            <BigMoney cents={totals.outstandingCents} size="text-[42px]" className="mt-1.5" />
+          </div>
+          {(expenses.length > 0 || members.length > 0) && (
+            <PdfExportButton
+              compact
+              label="Export summary"
+              filename={`utang-tracker-summary-${todayISO()}.pdf`}
+              shareTitle="Utang Tracker Summary"
+              getPdfBytes={() =>
+                buildLedgerPdf({
+                  members,
+                  expenses,
+                  payments: ledger.payments,
+                })
+              }
+            />
+          )}
+        </div>
+
+        <p className="mt-2 text-[13.5px] text-slate-600">
+          {totals.outstandingCents > 0
+            ? `From ${debtors} ${debtors === 1 ? "person" : "people"} across ${totals.unsettledCount} open ${totals.unsettledCount === 1 ? "bill" : "bills"}`
+            : expenses.length > 0
+            ? "Everyone is settled up"
+            : "Add an expense to start splitting bills"}
+        </p>
+
+        {/* Two-tone collection bar + ledger readout */}
+        <div className="mt-4 rounded-2xl bg-white p-4 shadow-hairline">
+          <SplitBar value={collectedPct} />
+          <div className="mt-3 flex items-center justify-between text-[12.5px]">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
+              <span className="text-slate-500">Collected</span>
+              <span className="tabular font-semibold text-ink">{formatPHP(totals.settledCents)}</span>
+              <span className="tabular text-slate-400">({Math.round(collectedPct)}%)</span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-500">Spent </span>
+              <span className="tabular font-semibold text-ink">{formatPHP(totals.expensesCents)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Primary actions */}
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <Link
+            href="/expenses?new=1"
+            className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white"
+          >
+            <Plus className="h-4 w-4 text-mint" strokeWidth={2.4} />
+            New expense
+          </Link>
+          <Link
+            href="/payments?new=1"
+            className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-[14px] font-semibold text-ink shadow-hairline"
+          >
+            <HandCoins className="h-4 w-4 text-ink-muted" strokeWidth={1.9} />
+            Record payment
+          </Link>
+        </div>
+      </section>
+
+      {/* Who owes you */}
+      <section aria-label="People">
+        <SectionLabel
+          action={
+            members.length > 0 && (
+              <Link href="/members" className="text-[12.5px] font-medium text-ink-soft">
+                All ({members.length}) →
+              </Link>
+            )
+          }
+        >
+          Who owes you
+        </SectionLabel>
+        <ListGroup>
+          {members.length === 0 ? (
+            <MobileEmpty icon={Users} title="No people yet" description="Add the friends or housemates you split bills with.">
+              <Button asChild size="sm">
+                <Link href="/members?new=1">
+                  <Plus /> Add member
+                </Link>
+              </Button>
+            </MobileEmpty>
+          ) : ranked.length === 0 ? (
+            <MobileEmpty icon={Users} title="Nobody owes anything" description="Balances show up once someone is included in a bill." />
+          ) : (
+            ranked.map((m) => {
+              const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
+              return (
+                <ListRow
+                  key={m.id}
+                  as={Link}
+                  href={`/members/${m.id}`}
+                  className="tap"
+                  leading={<Avatar name={m.name} id={m.id} />}
+                  title={m.name}
+                  subtitle={`${formatPHP(m.paidCents)} of ${formatPHP(m.assignedCents)} paid`}
+                  trailing={
+                    <div className="flex items-center gap-2">
+                      <Amount
+                        value={formatPHP(Math.max(m.balanceCents, 0))}
+                        caption={m.balanceCents > 0 ? "owes" : "settled"}
+                        tone={m.balanceCents > 0 ? "text-ink" : "text-slate-400"}
+                      />
+                      <ChevronRight className="h-4 w-4 text-slate-300" aria-hidden="true" />
+                    </div>
+                  }
+                >
+                  <MiniMeter value={pct} className="mt-2" />
+                </ListRow>
+              );
+            })
+          )}
+        </ListGroup>
+      </section>
+
+      {/* Latest bills */}
+      <section aria-label="Latest bills">
+        <SectionLabel
+          action={
+            expenses.length > 0 && (
+              <Link href="/expenses" className="text-[12.5px] font-medium text-ink-soft">
+                See all ({expenses.length}) →
+              </Link>
+            )
+          }
+        >
+          Latest bills
+        </SectionLabel>
+        <ListGroup>
+          {recent.length === 0 ? (
+            <MobileEmpty icon={Receipt} title="No expenses yet" description="Bills you log will appear here, newest first.">
+              <Button asChild size="sm">
+                <Link href="/expenses?new=1">
+                  <Plus /> Add expense
+                </Link>
+              </Button>
+            </MobileEmpty>
+          ) : (
+            recent.map((e) => {
+              const count = (e.userShareCents > 0 ? 1 : 0) + e.shares.length;
+              return (
+                <ListRow
+                  key={e.id}
+                  as="button"
+                  type="button"
+                  onClick={() => setViewing(e)}
+                  className="tap"
+                  leading={<CategoryGlyph category={e.category} />}
+                  title={e.description}
+                  subtitle={`${shortDate(e.date)} · ${e.category} · ${count} ${count === 1 ? "person" : "people"}`}
+                  trailing={
+                    <div className="shrink-0 text-right">
+                      <div className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(e.totalCents)}</div>
+                      <StatusText status={e.status} className="mt-0.5 justify-end" />
+                    </div>
+                  }
+                />
+              );
+            })
+          )}
+        </ListGroup>
+      </section>
+
+      {/* Compact 14-day spending pulse */}
+      {expenses.length > 0 && (
+        <section aria-label="14-day spending">
+          <SectionLabel
+            action={
+              <Link href="/reports" className="text-[12.5px] font-medium text-ink-soft">
+                Reports →
+              </Link>
+            }
+          >
+            Last 14 days
+          </SectionLabel>
+          <Link href="/reports" className="tap block rounded-2xl bg-white p-4 shadow-hairline">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[12.5px] text-slate-500">14-day spend</span>
+              <span className="tabular text-[16px] font-semibold text-ink">{formatPHP(fourteenDayTotal)}</span>
+            </div>
+            <div className="mt-3 flex h-14 items-end gap-1.5" aria-hidden="true">
+              {daily.map((d) => {
+                const h = d.totalCents > 0 ? Math.max(14, Math.round((d.totalCents / maxDay) * 100)) : 6;
+                return (
+                  <div key={d.key ?? d.label} className="flex h-full flex-1 items-end">
+                    <span
+                      className={`w-full rounded-sm ${d.totalCents > 0 ? "bg-ink" : "bg-slate-100"}`}
+                      style={{ height: `${h}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between font-mono text-[10px] text-slate-400">
+              <span>{daily[0]?.label}</span>
+              <span>Today</span>
+            </div>
+          </Link>
+        </section>
+      )}
+
+      <ExpenseDetailDialog expense={viewing} onOpenChange={(o) => !o && setViewing(null)} />
+    </div>
+  );
+}
 
 export function DashboardView({ ledger }) {
   const { totals, members, expenses } = ledger;
-  const [mobileTab, setMobileTab] = useState("balances");
 
   const entries = useMemo(() => expenseEntries(expenses), [expenses]);
   const daily = useMemo(() => lastDaysSeries(entries, 14), [entries]);
@@ -186,108 +421,8 @@ export function DashboardView({ ledger }) {
   return (
     <>
       {/* ==================== MOBILE APP SCREEN (< lg) ==================== */}
-      <div className="space-y-4 lg:hidden">
-        {/* Mobile Wallet Summary Card */}
-        <div className="overflow-hidden rounded-2xl bg-slate-900 p-4 text-white shadow-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Total Outstanding</p>
-              <p className="tabular mt-1 text-[28px] font-bold leading-none tracking-[-0.03em] text-white">
-                {formatPHP(totals.outstandingCents)}
-              </p>
-              <p className="mt-1.5 text-[12px] text-slate-300">
-                Owed by {debtors} {debtors === 1 ? "member" : "members"} · {totals.unsettledCount} open {totals.unsettledCount === 1 ? "bill" : "bills"}
-              </p>
-            </div>
-            {(expenses.length > 0 || members.length > 0) && (
-              <div className="[&_button]:border-slate-700 [&_button]:bg-slate-800 [&_button]:text-slate-100 [&_button:hover]:bg-slate-700">
-                <PdfExportButton
-                  label="PDF"
-                  filename={`utang-tracker-summary-${todayISO()}.pdf`}
-                  shareTitle="Utang Tracker Summary"
-                  getPdfBytes={() =>
-                    buildLedgerPdf({
-                      members,
-                      expenses,
-                      payments: ledger.payments,
-                    })
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Collection progress bar */}
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-[11.5px]">
-              <span className="text-slate-300">Collection progress</span>
-              <span className="tabular font-semibold text-emerald-400">{Math.round(collectedPct)}% collected</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full bg-emerald-400 transition-all duration-500" style={{ width: `${Math.max(0, Math.min(100, collectedPct))}%` }} />
-            </div>
-          </div>
-
-          {/* Mini stats strip */}
-          <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-slate-800 pt-3.5">
-            <div className="rounded-xl bg-slate-800/70 px-3 py-2.5">
-              <p className="text-[10.5px] font-medium uppercase tracking-wider text-slate-400">Collected</p>
-              <p className="tabular mt-0.5 text-[15px] font-semibold text-emerald-400">{formatPHP(totals.settledCents)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-800/70 px-3 py-2.5">
-              <p className="text-[10.5px] font-medium uppercase tracking-wider text-slate-400">Total Spent</p>
-              <p className="tabular mt-0.5 text-[15px] font-semibold text-white">{formatPHP(totals.expensesCents)}</p>
-            </div>
-          </div>
-
-          {/* Quick mobile actions */}
-          <div className="mt-3.5 grid grid-cols-2 gap-2">
-            <Button asChild size="sm" variant="accent" className="w-full rounded-xl font-semibold">
-              <Link href="/expenses?new=1">
-                <Plus className="h-4 w-4" /> Add expense
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline" className="w-full rounded-xl border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white">
-              <Link href="/payments">
-                <Wallet className="h-4 w-4" /> Payments
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Segmented Screen Switcher */}
-        <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Overview sections">
-          {MOBILE_SECTIONS.map(({ id, label, icon: Icon }) => {
-            const active = mobileTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setMobileTab(id)}
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold transition-all ${
-                  active ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Active Mobile Sub-screen */}
-        {mobileTab === "balances" && <Receivables members={members} />}
-        {mobileTab === "activity" && <RecentActivity expenses={expenses} />}
-        {mobileTab === "spending" && (
-          <div className="space-y-4">
-            <SpendingBarChart title="Daily" description="Last 14 days" data={daily} emptyText="No expenses in the last 14 days" />
-            <SpendingBarChart title="Monthly" description="Last 6 months" data={monthly} emptyText="No expenses in the last 6 months" tickInterval={0} />
-            <CategoryChart title="By category" description="Share of total spending" data={categories} />
-            <SettlementChart title="Collection" description="Received vs still owed" settledCents={totals.settledCents} outstandingCents={totals.outstandingCents} />
-          </div>
-        )}
+      <div className="lg:hidden">
+        <MobileOverview ledger={ledger} daily={daily} collectedPct={collectedPct} debtors={debtors} />
       </div>
 
       {/* ==================== DESKTOP VIEW (lg+) ==================== */}

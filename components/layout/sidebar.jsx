@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, BarChart3, ChevronRight, LayoutDashboard, LogOut, Plus, Receipt, Settings, Users, Wallet } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, HandCoins, LayoutDashboard, LogOut, Plus, Receipt, Settings, UserPlus, Users, Wallet } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
+import { ActionSheet } from "@/components/layout/mobile";
 import { cn } from "@/lib/utils";
 
 const NAV_GROUPS = [
@@ -29,11 +30,10 @@ const NAV_GROUPS = [
 ];
 
 const MOBILE_TABS = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/payments", label: "Payments", icon: Wallet },
-  { href: "/members", label: "Members", icon: Users },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/members", label: "People", icon: Users },
 ];
 
 const ALL_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), { href: "/settings", label: "Settings", icon: Settings }];
@@ -185,95 +185,110 @@ function Topbar({ pathname }) {
   );
 }
 
-/** Mobile top app header + fixed bottom tab navigation bar for smaller devices (< lg). */
-function MobileAppShell({ pathname }) {
+/** Mobile top bar + bottom tab bar with a centre "create" key (< lg). */
+function MobileAppShell({ pathname, email }) {
+  const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(false);
   const current = ALL_ITEMS.find((i) => isActive(pathname, i.href));
   const isDetail = current && pathname !== current.href;
   const settingsActive = isActive(pathname, "/settings");
+  const reportsActive = isActive(pathname, "/reports");
+  const initial = (email || "A").trim().charAt(0).toUpperCase();
 
   return (
     <>
-      {/* Mobile App Top Bar */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/90 bg-white/95 px-3.5 backdrop-blur lg:hidden">
-        <div className="flex min-w-0 items-center gap-2.5">
+      {/* Top bar: brand on root screens, back button on detail screens */}
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden">
+        <div className="flex h-14 items-center justify-between px-4">
           {isDetail ? (
-            <Link
-              href={current.href}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs active:bg-slate-50"
-              aria-label={`Back to ${current.label}`}
-            >
-              <ArrowLeft className="h-4 w-4" />
+            <Link href={current.href} className="press -ml-1.5 inline-flex h-10 items-center gap-0.5 rounded-full pl-1 pr-3 text-[15px] font-medium text-ink" aria-label={`Back to ${current.label}`}>
+              <ChevronLeft className="h-[22px] w-[22px]" strokeWidth={2} />
+              {current.label}
             </Link>
           ) : (
-            <Link href="/dashboard" aria-label="Utang Tracker Home">
-              <BrandMark surface="card" className="h-8 w-8" />
+            <Link href="/dashboard" className="flex items-center gap-2" aria-label="Utang Tracker home">
+              <img src="/logo-mark.png" alt="" className="h-7 w-7 object-contain" />
+              <span className="text-[15.5px] font-semibold tracking-[-0.02em] text-ink">
+                utang<span className="font-normal text-mint-deep">tracker</span>
+              </span>
             </Link>
           )}
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold leading-tight tracking-[-0.01em] text-slate-900">
-              {isDetail ? `${current.label} · Details` : current?.label || "Utang Tracker"}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-1.5">
-          <Button asChild size="sm" className="h-8 rounded-full px-3 text-[12px]">
-            <Link href="/expenses?new=1" aria-label="New expense">
-              <Plus className="h-3.5 w-3.5" /> Expense
+          <div className="flex items-center gap-2">
+            <Link
+              href="/reports"
+              aria-label="Reports"
+              aria-current={reportsActive ? "page" : undefined}
+              className={cn(
+                "press inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                reportsActive ? "bg-ink text-white" : "text-ink hover:bg-white"
+              )}
+            >
+              <BarChart3 className="h-[18px] w-[18px]" strokeWidth={1.9} />
             </Link>
-          </Button>
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            aria-current={settingsActive ? "page" : undefined}
-            className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
-              settingsActive
-                ? "border-teal-600 bg-teal-50 text-teal-700"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            )}
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
+            <Link
+              href="/settings"
+              aria-label="Settings and account"
+              aria-current={settingsActive ? "page" : undefined}
+              className={cn(
+                "press inline-flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-semibold transition-colors",
+                settingsActive ? "bg-ink text-white" : "bg-white text-ink shadow-hairline"
+              )}
+            >
+              {initial}
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav
-        aria-label="Bottom Navigation"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/90 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-6px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
-      >
-        <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-1">
-          {MOBILE_TABS.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "group relative flex h-full flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:outline-none",
-                  active ? "text-teal-700" : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-teal-600" aria-hidden="true" />}
-                <span
-                  className={cn(
-                    "flex h-7 w-11 items-center justify-center rounded-full transition-colors",
-                    active ? "bg-teal-50 text-teal-700" : "group-hover:bg-slate-100"
-                  )}
-                >
-                  <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 1.85} />
-                </span>
-                <span className={cn("text-[10.5px] leading-none tracking-[-0.01em]", active ? "font-semibold text-teal-800" : "font-medium text-slate-500")}>
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
+      {/* Bottom tab bar */}
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+        <div className="mx-auto grid h-[60px] max-w-lg grid-cols-5 items-center px-2">
+          {MOBILE_TABS.slice(0, 2).map((tab) => (
+            <TabLink key={tab.href} {...tab} active={isActive(pathname, tab.href)} />
+          ))}
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              aria-label="Create new"
+              aria-haspopup="dialog"
+              className="press flex h-11 w-11 items-center justify-center rounded-[14px] bg-ink text-mint shadow-[0_6px_16px_-6px_rgba(20,28,58,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 focus-visible:ring-offset-2"
+            >
+              <Plus className="h-[22px] w-[22px]" strokeWidth={2.4} />
+            </button>
+          </div>
+          {MOBILE_TABS.slice(2).map((tab) => (
+            <TabLink key={tab.href} {...tab} active={isActive(pathname, tab.href)} />
+          ))}
         </div>
       </nav>
+
+      <ActionSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Create"
+        actions={[
+          { label: "New expense", description: "Log a bill and split it", icon: Receipt, primary: true, onSelect: () => router.push("/expenses?new=1") },
+          { label: "Record payment", description: "Someone paid you back", icon: HandCoins, onSelect: () => router.push("/payments?new=1") },
+          { label: "Add member", description: "Someone you share bills with", icon: UserPlus, onSelect: () => router.push("/members?new=1") },
+        ]}
+      />
     </>
+  );
+}
+
+function TabLink({ href, label, icon: Icon, active }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className="press flex h-full flex-col items-center justify-center gap-[3px] focus-visible:outline-none"
+    >
+      <Icon className={cn("h-[21px] w-[21px] transition-colors", active ? "text-ink" : "text-slate-400")} strokeWidth={active ? 2.2 : 1.8} />
+      <span className={cn("text-[10.5px] leading-none tracking-[-0.005em] transition-colors", active ? "font-semibold text-ink" : "font-medium text-slate-500")}>{label}</span>
+      <span className={cn("mt-0.5 h-[3px] w-[3px] rounded-full", active ? "bg-mint-deep" : "bg-transparent")} aria-hidden="true" />
+    </Link>
   );
 }
 
@@ -294,7 +309,7 @@ export function Sidebar({ email }) {
       <Topbar pathname={pathname} />
 
       {/* Mobile Screen App Bar + Bottom Navigation */}
-      <MobileAppShell pathname={pathname} />
+      <MobileAppShell pathname={pathname} email={email} />
     </>
   );
 }

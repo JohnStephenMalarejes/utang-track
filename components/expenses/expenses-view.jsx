@@ -15,19 +15,25 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
 import { Pagination } from "@/components/layout/pagination";
 import { PdfExportButton } from "@/components/layout/pdf-export-button";
+import {
+  CategoryGlyph,
+  IconButton,
+  ListGroup,
+  ListRow,
+  MobileEmpty,
+  SearchField,
+  SectionLabel,
+  StatusText,
+  UnderlineTabs,
+  dayLabel,
+  groupByDate,
+} from "@/components/layout/mobile";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { ExpenseDetailDialog } from "./expense-detail-dialog";
 import { CATEGORIES, PAGE_SIZE, STATUS_LABELS } from "@/lib/constants";
-import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
+import { buildLedgerPdf, formatDate, formatPHP, sumCents, todayISO } from "@/lib/utils";
 
 const NO_FILTERS = { query: "", from: "", to: "", category: "", member: "", status: "" };
-
-const STATUS_PILLS = [
-  { value: "", label: "All" },
-  { value: "unsettled", label: "Unsettled" },
-  { value: "partial", label: "Partial" },
-  { value: "settled", label: "Settled" },
-];
 
 export function ExpensesView({ ledger, initialOpen = false }) {
   const { expenses, members } = ledger;
@@ -66,6 +72,18 @@ export function ExpensesView({ ledger, initialOpen = false }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const groupedRows = useMemo(() => groupByDate(rows, (e) => e.date), [rows]);
+  const filteredTotal = useMemo(() => sumCents(filtered.map((e) => e.totalCents)), [filtered]);
+
+  const statusTabs = useMemo(
+    () => [
+      { id: "", label: "All", count: expenses.length },
+      { id: "unsettled", label: "Unpaid", count: expenses.filter((e) => e.status === "unsettled").length },
+      { id: "partial", label: "Partial", count: expenses.filter((e) => e.status === "partial").length },
+      { id: "settled", label: "Settled", count: expenses.filter((e) => e.status === "settled").length },
+    ],
+    [expenses]
+  );
 
   // The live copy of the expense being viewed, so details refresh after edits
   const viewingLive = viewing ? expenses.find((e) => e.id === viewing.id) ?? null : null;
@@ -79,7 +97,34 @@ export function ExpensesView({ ledger, initialOpen = false }) {
 
   return (
     <>
-      <PageHeader eyebrow="Ledger" title="Expenses" description="Every shared bill and how it was split.">
+      <PageHeader
+        eyebrow="Ledger"
+        title="Expenses"
+        description="Every shared bill and how it was split."
+        mobileSubtitle={expenses.length > 0 ? `${filtered.length} ${filtered.length === 1 ? "bill" : "bills"} · ${formatPHP(filteredTotal)}` : "Shared bills and splits"}
+        mobileActions={
+          <>
+            {filtered.length > 0 && (
+              <PdfExportButton
+                compact
+                label="Export expenses"
+                filename={`utang-tracker-expenses-${todayISO()}.pdf`}
+                shareTitle="Utang Tracker Expenses"
+                getPdfBytes={() =>
+                  buildLedgerPdf({
+                    members,
+                    expenses: filtered,
+                    allExpenses: expenses,
+                  })
+                }
+              />
+            )}
+            <IconButton tone="solid" aria-label="Add expense" onClick={() => openForm()}>
+              <Plus />
+            </IconButton>
+          </>
+        }
+      >
         {filtered.length > 0 && (
           <PdfExportButton
             filename={`utang-tracker-expenses-${todayISO()}.pdf`}
@@ -109,75 +154,41 @@ export function ExpensesView({ ledger, initialOpen = false }) {
       ) : (
         <>
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
-          <div className="space-y-3 md:hidden">
+          <div className="space-y-4 md:hidden">
+            <UnderlineTabs
+              label="Filter by status"
+              tabs={statusTabs}
+              value={filters.status}
+              onChange={(status) => {
+                setFilters((f) => ({ ...f, status }));
+                setPage(1);
+              }}
+            />
+
             {/* Search + Filter Toggle */}
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={filters.query}
-                  onChange={setFilter("query")}
-                  placeholder="Search bills, notes, members..."
-                  aria-label="Search expenses"
-                  className="h-10 rounded-xl bg-white pl-9"
-                />
-              </div>
-              <Button
+              <SearchField value={filters.query} onChange={setFilter("query")} placeholder="Search bills, notes, people…" aria-label="Search expenses" />
+              <button
                 type="button"
-                variant={showMobileFilters || extraFilterCount > 0 ? "default" : "outline"}
-                size="sm"
                 onClick={() => setShowMobileFilters((v) => !v)}
-                className="h-10 shrink-0 rounded-xl px-3"
                 aria-expanded={showMobileFilters}
+                aria-label="More filters"
+                className={`press relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                  showMobileFilters || extraFilterCount > 0 ? "bg-ink text-white" : "bg-white text-ink shadow-hairline"
+                }`}
               >
-                <SlidersHorizontal className="h-4 w-4" />
+                <SlidersHorizontal className="h-[18px] w-[18px]" />
                 {extraFilterCount > 0 && (
-                  <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-slate-950">
+                  <span className="tabular absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mint px-1 text-[11px] font-bold text-ink">
                     {extraFilterCount}
                   </span>
                 )}
-              </Button>
-            </div>
-
-            {/* Quick Status Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-              {STATUS_PILLS.map((pill) => {
-                const active = filters.status === pill.value;
-                return (
-                  <button
-                    key={pill.value}
-                    type="button"
-                    onClick={() => {
-                      setFilters((f) => ({ ...f, status: pill.value }));
-                      setPage(1);
-                    }}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                      active
-                        ? "bg-slate-900 text-white shadow-xs"
-                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
-                );
-              })}
-              {filtersActive && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilters(NO_FILTERS);
-                    setPage(1);
-                  }}
-                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium text-teal-700"
-                >
-                  <X className="h-3 w-3" /> Reset
-                </button>
-              )}
+              </button>
             </div>
 
             {/* Collapsible Extra Filters Panel */}
             {showMobileFilters && (
-              <Card className="space-y-3 p-3.5">
+              <div className="space-y-3 rounded-2xl bg-white p-4 shadow-hairline">
                 <div className="grid grid-cols-2 gap-2.5">
                   <Select aria-label="Filter by category" value={filters.category} onChange={setFilter("category")}>
                     <option value="">All categories</option>
@@ -186,7 +197,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                     ))}
                   </Select>
                   <Select aria-label="Filter by member" value={filters.member} onChange={setFilter("member")}>
-                    <option value="">All members</option>
+                    <option value="">All people</option>
                     {members.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name}
@@ -195,73 +206,76 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
-                  <label className="space-y-1 text-[11px] font-medium text-slate-600">
-                    <span>From date</span>
-                    <Input type="date" value={filters.from} onChange={setFilter("from")} aria-label="From date" className="h-9" />
+                  <label className="space-y-1 text-[11.5px] font-medium text-slate-500">
+                    <span>From</span>
+                    <Input type="date" value={filters.from} onChange={setFilter("from")} aria-label="From date" />
                   </label>
-                  <label className="space-y-1 text-[11px] font-medium text-slate-600">
-                    <span>To date</span>
-                    <Input type="date" value={filters.to} onChange={setFilter("to")} aria-label="To date" className="h-9" />
+                  <label className="space-y-1 text-[11.5px] font-medium text-slate-500">
+                    <span>To</span>
+                    <Input type="date" value={filters.to} onChange={setFilter("to")} aria-label="To date" />
                   </label>
                 </div>
-              </Card>
+                {filtersActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters(NO_FILTERS);
+                      setPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 text-[12.5px] font-medium text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" /> Reset all filters
+                  </button>
+                )}
+              </div>
             )}
 
-            {/* Mobile Expense Cards */}
+            {/* Date-grouped feed */}
             {filtered.length === 0 ? (
-              <Card>
-                <EmptyState icon={Search} title="No matching expenses" description="Try widening the date range or clearing a filter.">
-                  <Button variant="outline" onClick={() => (setFilters(NO_FILTERS), setPage(1))}>
+              <ListGroup>
+                <MobileEmpty icon={Search} title="No matching bills" description="Try widening the date range or clearing a filter.">
+                  <Button variant="outline" size="sm" onClick={() => (setFilters(NO_FILTERS), setPage(1))}>
                     Clear filters
                   </Button>
-                </EmptyState>
-              </Card>
+                </MobileEmpty>
+              </ListGroup>
             ) : (
-              <div className="space-y-2.5">
-                {rows.map((e) => {
-                  const people = [...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)];
-                  return (
-                    <div
-                      key={e.id}
-                      className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs transition-colors active:bg-slate-50/70"
+              <div className="space-y-5">
+                {groupedRows.map(([date, items]) => (
+                  <section key={date} aria-label={dayLabel(date)}>
+                    <SectionLabel
+                      action={<span className="tabular text-[12px] font-medium text-slate-400">{formatPHP(sumCents(items.map((i) => i.totalCents)))}</span>}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setViewing(e)}
-                          className="min-w-0 flex-1 text-left focus-visible:outline-none"
-                        >
-                          <p className="truncate text-[14.5px] font-semibold text-slate-900">{e.description}</p>
-                          <p className="mt-0.5 text-[12px] text-slate-500">
-                            {formatDate(e.date)} · <span className="font-medium text-slate-700">{e.category}</span> · Paid by {e.paidByName ?? "You"}
-                          </p>
-                        </button>
-                        <p className="tabular shrink-0 text-[15px] font-bold text-slate-900">{formatPHP(e.totalCents)}</p>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <StatusBadge status={e.status} />
-                          <span className="truncate text-[11.5px] text-slate-500">{people.join(", ")}</span>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`View ${e.description}`} onClick={() => setViewing(e)}>
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${e.description}`} onClick={() => openForm(e)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" aria-label={`Delete ${e.description}`} onClick={() => setToDelete(e)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <Card className="overflow-hidden">
+                      {dayLabel(date)}
+                    </SectionLabel>
+                    <ListGroup>
+                      {items.map((e) => {
+                        const people = [...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)];
+                        return (
+                          <ListRow
+                            key={e.id}
+                            as="button"
+                            type="button"
+                            onClick={() => setViewing(e)}
+                            className="tap"
+                            leading={<CategoryGlyph category={e.category} />}
+                            title={e.description}
+                            subtitle={`Paid by ${e.paidByName ?? "You"} · ${people.join(", ")}`}
+                            trailing={
+                              <div className="shrink-0 text-right">
+                                <div className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(e.totalCents)}</div>
+                                <StatusText status={e.status} className="mt-0.5 justify-end" />
+                              </div>
+                            }
+                          />
+                        );
+                      })}
+                    </ListGroup>
+                  </section>
+                ))}
+                <ListGroup>
                   <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
-                </Card>
+                </ListGroup>
               </div>
             )}
           </div>
@@ -377,7 +391,18 @@ export function ExpensesView({ ledger, initialOpen = false }) {
       )}
 
       <ExpenseFormDialog open={formOpen} onOpenChange={setFormOpen} ledger={ledger} expense={editing} />
-      <ExpenseDetailDialog expense={viewingLive} onOpenChange={(o) => !o && setViewing(null)} />
+      <ExpenseDetailDialog
+        expense={viewingLive}
+        onOpenChange={(o) => !o && setViewing(null)}
+        onEdit={(exp) => {
+          setViewing(null);
+          openForm(exp);
+        }}
+        onDelete={(exp) => {
+          setViewing(null);
+          setToDelete(exp);
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(toDelete)}

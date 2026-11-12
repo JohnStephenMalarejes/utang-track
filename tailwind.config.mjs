@@ -7,6 +7,10 @@ const config = {
     container: { center: true, padding: "1rem", screens: { "2xl": "1400px" } },
     extend: {
       colors: {
+        // Brand tokens lifted from the logo: navy ink + mint arrow.
+        ink: { DEFAULT: "#141C3A", soft: "#2B3456", muted: "#5B6380" },
+        mint: { DEFAULT: "#5CD3A3", deep: "#127A57", soft: "#E4F6EE" },
+        canvas: "#F2F3F5",
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",
@@ -59,6 +63,8 @@ const config = {
         card: "0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.03)",
         button: "0 1px 2px 0 rgb(15 23 42 / 0.06)",
         pop: "0 12px 32px -8px rgb(15 23 42 / 0.16), 0 2px 6px -2px rgb(15 23 42 / 0.08)",
+        sheet: "0 -12px 40px -12px rgb(20 28 58 / 0.25)",
+        hairline: "0 0 0 1px rgb(20 28 58 / 0.06), 0 1px 2px rgb(20 28 58 / 0.04)",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],

@@ -17,7 +17,7 @@ export function LoginForm() {
       <Field label="Password" htmlFor="password" error={state?.error}>
         <Input id="password" name="password" type="password" autoComplete="current-password" required aria-invalid={Boolean(state?.error)} />
       </Field>
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" className="h-11 w-full rounded-xl bg-ink text-[15px] font-semibold sm:h-9 sm:rounded-md sm:bg-slate-900 sm:text-[13px]" disabled={pending}>
         {pending && <Loader2 className="animate-spin" />}
         Sign in
       </Button>

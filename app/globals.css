@@ -43,10 +43,34 @@
   }
   html {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: pan-x pan-y;
+    overscroll-behavior-y: none;
   }
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "cv11", "ss01";
+    touch-action: pan-x pan-y;
+    overscroll-behavior-y: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  [role="button"],
+  [role="tab"],
+  [role="radio"] {
+    touch-action: manipulation;
   }
   ::selection {
     background: hsl(var(--accent) / 0.22);
@@ -64,6 +88,32 @@
   /* Small uppercase section label */
   .eyebrow {
     @apply text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500;
+  }
+
+  /* ---------- Mobile app primitives ---------- */
+  /* Horizontal scrollers (chips, tabs) without a visible scrollbar */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Tactile press feedback for tappable rows and buttons on touch screens */
+  .press {
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease, transform 120ms ease;
+  }
+  .press:active {
+    transform: scale(0.985);
+  }
+  /* Row press feedback without the scale (for full-width list rows) */
+  .tap {
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease;
+  }
+  .tap:active {
+    background-color: rgb(20 28 58 / 0.04);
   }
 }
 
