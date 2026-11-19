@@ -71,7 +71,7 @@ export default function LoginScreen() {
                   contentFit="contain"
                 />
               </View>
-              <Text style={T.micro}>Debt Tracker</Text>
+              <Text style={T.micro}>Solvent</Text>
               <Text style={[styles.title, { color: C.ink }]}>Sign in</Text>
               {!hasAccounts && (
                 <Text style={[styles.firstTimeNote, { color: C.muted }]}>

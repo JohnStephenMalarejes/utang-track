@@ -85,8 +85,7 @@ export interface LedgerColors {
 
   // Chime-inspired deep forest hero & soft mint highlight tokens
   heroBg: string;
-  heroGlow: string;
-  heroGlowSoft: string;
+  heroGradient: string;
   heroText: string;
   heroMuted: string;
   heroAccent: string;
@@ -148,8 +147,7 @@ export const LIGHT_COLORS: LedgerColors = {
   cardBarFill: '#10B981',
 
   heroBg: '#0B3522',
-  heroGlow: '#145C3A',
-  heroGlowSoft: '#19754A',
+  heroGradient: 'linear-gradient(140deg, #102B1E 0%, #0D4D2E 45%, #12663D 74%, #0A3721 100%)',
   heroText: '#FFFFFF',
   heroMuted: 'rgba(255, 255, 255, 0.78)',
   heroAccent: '#34D399',
@@ -205,8 +203,7 @@ export const DARK_COLORS: LedgerColors = {
   cardBarFill: '#10B981',
 
   heroBg: '#072417',
-  heroGlow: '#0F452B',
-  heroGlowSoft: '#145C3A',
+  heroGradient: 'linear-gradient(140deg, #071911 0%, #0A3822 48%, #0E4D2F 76%, #061D12 100%)',
   heroText: '#FFFFFF',
   heroMuted: 'rgba(255, 255, 255, 0.76)',
   heroAccent: '#34D399',

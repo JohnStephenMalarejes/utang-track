@@ -102,25 +102,16 @@ export default function HomeScreen() {
 
   return (
     <MobileScreenWrapper bleedTop>
-      {/* Full-Bleed Deep Forest-Green Hero Canopy (Chime-inspired) */}
+      {/* Full-Bleed Deep Forest-Green Gradient Hero Canopy */}
       <View
         style={[
           styles.heroCanopy,
           {
             backgroundColor: C.heroBg,
+            backgroundImage: C.heroGradient,
             paddingTop: Math.max(insets.top, 14) + 6,
           },
         ]}>
-        {/* Layered ambient emerald glow (pure RN Views, zero extra native deps) */}
-        <View
-          pointerEvents="none"
-          style={[styles.heroGlowOrbLarge, { backgroundColor: C.heroGlow }]}
-        />
-        <View
-          pointerEvents="none"
-          style={[styles.heroGlowOrbSmall, { backgroundColor: C.heroGlowSoft }]}
-        />
-
         <View style={styles.heroInner}>
           {/* Top Utility Bar inside Canopy */}
           <View style={styles.heroUtilityRow}>
@@ -663,24 +654,6 @@ const styles = StyleSheet.create({
     paddingBottom: 92,
     overflow: 'hidden',
     position: 'relative',
-  },
-  heroGlowOrbLarge: {
-    position: 'absolute',
-    top: -90,
-    right: -60,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    opacity: 0.55,
-  },
-  heroGlowOrbSmall: {
-    position: 'absolute',
-    top: 40,
-    right: 40,
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    opacity: 0.25,
   },
   heroInner: {
     maxWidth: 640,

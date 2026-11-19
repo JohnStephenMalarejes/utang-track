@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Debt Tracker",
+    "name": "Solvent",
     "slug": "expense-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FAFAFA",
+          "backgroundColor": "#0E4328",
           "image": "./assets/images/logo-mark.png",
           "imageWidth": 96
         }

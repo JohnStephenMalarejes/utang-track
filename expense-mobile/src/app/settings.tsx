@@ -16,7 +16,6 @@ import { R, tabular } from '@/design/tokens';
 import { todayISO } from '@/lib/dates';
 import { hapticLight } from '@/lib/haptics';
 import { exportJsonBackup, exportLedgerSummaryPdf } from '@/lib/pdf';
-import { DB_NAME } from '@/lib/sqlite';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -45,7 +44,7 @@ export default function SettingsScreen() {
       <PageTitleBar
         eyebrow="Workspace"
         title="Settings"
-        subtitle="Appearance, account, local database & backups"
+        subtitle="Appearance, account & backups"
       />
 
       <View style={styles.stack}>
@@ -133,27 +132,6 @@ export default function SettingsScreen() {
                   <Text style={[styles.signOutText, { color: C.ink }]}>Sign out</Text>
                 </Pressable>
               }
-            />
-          </ListGroup>
-        </View>
-
-        {/* Database */}
-        <View>
-          <SectionLabel>Storage</SectionLabel>
-          <ListGroup>
-            <ListRow
-              leading={
-                <View
-                  style={[
-                    styles.dbSquare,
-                    { backgroundColor: C.sunken, borderColor: C.line },
-                  ]}>
-                  <Text style={[styles.dbSquareText, { color: C.ink2 }]}>DB</Text>
-                </View>
-              }
-              title="Local SQLite"
-              subtitle={`${DB_NAME} · Offline on-device storage`}
-              trailing={<Text style={[styles.statusActive, { color: C.paid }]}>Active</Text>}
             />
           </ListGroup>
         </View>
@@ -284,23 +262,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signOutText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-  },
-  dbSquare: {
-    width: 38,
-    height: 38,
-    borderRadius: R.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dbSquareText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  statusActive: {
     fontSize: 12.5,
     fontWeight: '600',
   },

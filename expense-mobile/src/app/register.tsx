@@ -80,7 +80,7 @@ export default function RegisterScreen() {
                   contentFit="contain"
                 />
               </View>
-              <Text style={T.micro}>Debt Tracker</Text>
+              <Text style={T.micro}>Solvent</Text>
               <Text style={[styles.title, { color: C.ink }]}>Create account</Text>
               <Text style={[styles.subtitle, { color: C.muted }]}>
                 Your ledger is saved locally in SQLite on this device.
