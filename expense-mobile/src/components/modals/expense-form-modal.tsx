@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,17 +8,28 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DatePickerField } from '@/components/date-picker';
-import { IconCheck, IconClose } from '@/components/icons';
+import { IconAlertCircle, IconCheck, IconClose } from '@/components/icons';
+import { BottomSheet, ErrorBanner, NumericDoneBar } from '@/components/mobile-ui';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
-import { bottomSafePad, R, tabular } from '@/design/tokens';
+import { bottomSafePad, METRICS, R, tabular } from '@/design/tokens';
 import { saveExpense } from '@/lib/actions';
 import { CATEGORIES } from '@/lib/constants';
 import { todayISO } from '@/lib/dates';
 import { hapticLight } from '@/lib/haptics';
 import { LedgerExpense, LedgerMember } from '@/lib/ledger';
 import { centsToDecimal, formatPHP, parseAmount, splitEqual, sumCents } from '@/lib/money';
+
+const EXPENSE_AMOUNT_ACCESSORY_ID = 'expense-amount-done';
+
+function heroFontSizeFor(text: string): number {
+  const len = text.length;
+  if (len >= 11) return 26;
+  if (len >= 8) return 34;
+  return 42;
+}
 
 interface ExpenseFormData {
   description: string;
@@ -85,6 +93,7 @@ function fromExpense(expense: LedgerExpense, members: LedgerMember[]): ExpenseFo
 
 export function ExpenseFormModal() {
   const { C, T } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { expenseFormState, closeExpenseForm, openMemberForm, ledger, refresh, showToast } = useLedger();
   const { open, expense } = expenseFormState;
   const editing = Boolean(expense);
@@ -182,19 +191,18 @@ export function ExpenseFormModal() {
     update({ custom: { ...form.custom, [memberId]: centsToDecimal(target) } });
   }
 
-  // Live sticky summary readout above footer
   const splitSummary = useMemo(() => {
     if (members.length === 0) return null;
     if (!totalCents || totalCents <= 0) {
       return {
         label: 'Enter total amount to calculate shares',
-        tone: 'muted' as const,
+        state: 'neutral' as const,
       };
     }
     if (participants.length === 0) {
       return {
         label: `Total ${formatPHP(totalCents)} · select participants`,
-        tone: 'muted' as const,
+        state: 'neutral' as const,
       };
     }
     if (form.mode === 'equal') {
@@ -203,30 +211,30 @@ export function ExpenseFormModal() {
         label: `Equal · ~${formatPHP(perHead)} each · ${splitCount} ${
           splitCount === 1 ? 'person' : 'people'
         }`,
-        tone: 'paid' as const,
+        state: 'balanced' as const,
       };
     }
     if (diff === 0 && allValid) {
       return {
         label: `Balanced · ${formatPHP(totalCents)} assigned`,
-        tone: 'paid' as const,
+        state: 'balanced' as const,
       };
     }
     if (diff > 0) {
       return {
         label: `${formatPHP(diff)} left to assign`,
-        tone: 'partial' as const,
+        state: 'error' as const,
       };
     }
     if (diff < 0) {
       return {
         label: `${formatPHP(-diff)} over total`,
-        tone: 'owed' as const,
+        state: 'error' as const,
       };
     }
     return {
       label: 'Enter each share above ₱0.00',
-      tone: 'partial' as const,
+      state: 'neutral' as const,
     };
   }, [members.length, totalCents, participants.length, form.mode, splitCount, diff, allValid]);
 
@@ -241,7 +249,7 @@ export function ExpenseFormModal() {
         ? 'The total is too small to give everyone at least ₱0.01'
         : 'Every participant needs an amount above ₱0.00';
     if (form.mode === 'custom' && diff !== 0)
-      return `The shares are ${formatPHP(Math.abs(diff))} ${diff > 0 ? 'short of' : 'over'} the total`;
+      return `Shares are ${formatPHP(Math.abs(diff))} ${diff > 0 ? 'short of' : 'over'} the total`;
     return '';
   }
 
@@ -278,167 +286,212 @@ export function ExpenseFormModal() {
   }
 
   const inputTheme = {
-    borderColor: C.lineStrong,
+    borderColor: C.line,
     color: C.ink,
     backgroundColor: C.surface,
   };
 
+  const sheetHeader = (
+    <View style={[styles.header, { borderBottomColor: C.line }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.title, { color: C.ink }]}>
+          {editing ? 'Edit expense' : 'New expense'}
+        </Text>
+        <Text style={[styles.subtitle, { color: C.muted }]}>
+          Record a bill and assign who owes what.
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel="Close"
+        hitSlop={4}
+        onPress={closeExpenseForm}
+        style={[styles.closeBtn, { backgroundColor: C.sunken }]}>
+        <IconClose size={16} color={C.ink} />
+      </Pressable>
+    </View>
+  );
+
+  const dynamicAmountSize = heroFontSizeFor(form.total);
+
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={closeExpenseForm}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.backdrop, { backgroundColor: C.scrim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => !pending && closeExpenseForm()} />
-        <View style={[styles.sheet, { backgroundColor: C.surface }]}>
-          <View style={[styles.handle, { backgroundColor: C.lineStrong }]} />
-          <View style={[styles.header, { borderBottomColor: C.line }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: C.ink }]}>
-                {editing ? 'Edit expense' : 'Add expense'}
-              </Text>
-              <Text style={[styles.subtitle, { color: C.muted }]}>
-                Record a bill and decide who owes what.
-              </Text>
-            </View>
+    <BottomSheet
+      open={open}
+      onClose={closeExpenseForm}
+      dismissible={!pending}
+      maxHeight="94%"
+      avoidKeyboard
+      header={sheetHeader}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={{ gap: 18, paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}>
+        {members.length === 0 ? (
+          <View
+            style={[
+              styles.noMembersNotice,
+              { backgroundColor: C.paper, borderColor: C.line },
+            ]}>
+            <Text style={[styles.noMembersText, { color: C.ink2 }]}>
+              Add at least one person before splitting a bill.
+            </Text>
             <Pressable
-              accessibilityLabel="Close"
-              onPress={closeExpenseForm}
-              style={[styles.closeBtn, { backgroundColor: C.sunken }]}>
-              <IconClose size={13} color={C.ink2} />
+              onPress={() => {
+                closeExpenseForm();
+                setTimeout(() => openMemberForm(), 120);
+              }}
+              style={[styles.addMemberLinkBtn, { backgroundColor: C.ink }]}>
+              <Text style={[styles.addMemberLinkText, { color: C.onInk }]}>Add person</Text>
             </Pressable>
           </View>
+        ) : null}
 
-          <ScrollView
-            style={styles.body}
-            contentContainerStyle={{ gap: 16, paddingBottom: 12 }}
-            keyboardShouldPersistTaps="handled">
-            {members.length === 0 ? (
-              <View
-                style={[
-                  styles.noMembersNotice,
-                  { backgroundColor: C.paper, borderColor: C.line },
-                ]}>
-                <Text style={[styles.noMembersText, { color: C.ink2 }]}>
-                  You need at least one member before you can record an expense.
-                </Text>
+        {/* Cash App-Inspired Distraction-Free Hero Total Amount */}
+        <View
+          style={[
+            styles.heroAmountBox,
+            { backgroundColor: C.paper, borderColor: C.line },
+          ]}>
+          <Text style={[styles.heroAmountEyebrow, { color: C.muted }]}>TOTAL BILL</Text>
+          <View style={styles.heroAmountRow}>
+            <Text style={[styles.heroCurrencySign, { color: C.muted }]}>₱</Text>
+            <TextInput
+              value={form.total}
+              onChangeText={(v) => update({ total: v })}
+              keyboardType="decimal-pad"
+              inputAccessoryViewID={EXPENSE_AMOUNT_ACCESSORY_ID}
+              placeholder="0.00"
+              placeholderTextColor={C.faint}
+              style={[
+                styles.heroAmountInput,
+                { color: C.ink, fontSize: dynamicAmountSize },
+              ]}
+            />
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={T.micro}>Description</Text>
+          <TextInput
+            value={form.description}
+            onChangeText={(v) => update({ description: v })}
+            maxLength={200}
+            placeholder="e.g. Dinner at Manam, Electricity bill"
+            placeholderTextColor={C.faint}
+            style={[styles.input, inputTheme]}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={T.micro}>Expense date</Text>
+          <DatePickerField
+            title="Expense date"
+            value={form.date}
+            onChange={(iso) => update({ date: iso })}
+            showQuickPresets
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={T.micro}>Category</Text>
+          <View style={styles.chipsWrap}>
+            {CATEGORIES.map((c) => {
+              const active = form.category === c;
+              return (
                 <Pressable
-                  onPress={() => {
-                    closeExpenseForm();
-                    setTimeout(() => openMemberForm(), 80);
-                  }}
-                  style={[styles.addMemberLinkBtn, { backgroundColor: C.ink }]}>
-                  <Text style={[styles.addMemberLinkText, { color: C.onInk }]}>Add a member</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            <View style={styles.field}>
-              <Text style={T.micro}>Description</Text>
-              <TextInput
-                value={form.description}
-                onChangeText={(v) => update({ description: v })}
-                maxLength={200}
-                placeholder="e.g. Chicken inasal at Mang Inasal"
-                placeholderTextColor={C.faint}
-                style={[styles.input, inputTheme]}
-              />
-            </View>
-
-            <View style={styles.row2}>
-              <View style={[styles.field, { flex: 1 }]}>
-                <Text style={T.micro}>Total amount (₱)</Text>
-                <TextInput
-                  value={form.total}
-                  onChangeText={(v) => update({ total: v })}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor={C.faint}
-                  style={[styles.input, inputTheme, tabular]}
-                />
-              </View>
-
-              <View style={[styles.field, { flex: 1 }]}>
-                <Text style={T.micro}>Expense date</Text>
-                <DatePickerField
-                  title="Expense date"
-                  value={form.date}
-                  onChange={(iso) => update({ date: iso })}
-                  showQuickPresets
-                />
-              </View>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={T.micro}>Category</Text>
-              <View style={styles.chipsWrap}>
-                {CATEGORIES.map((c) => {
-                  const active = form.category === c;
-                  return (
-                    <Pressable
-                      key={c}
-                      onPress={() => {
-                        hapticLight();
-                        update({ category: c });
-                      }}
-                      style={[
-                        styles.chip,
-                        { backgroundColor: C.sunken, borderColor: C.line },
-                        active && { backgroundColor: C.ink, borderColor: C.ink },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: active ? C.onInk : C.ink2 },
-                        ]}>
-                        {c}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={T.micro}>Who paid the original bill?</Text>
-              <View style={styles.chipsWrap}>
-                <Pressable
+                  key={c}
                   onPress={() => {
                     hapticLight();
-                    update({ paidBy: '' });
+                    update({ category: c });
                   }}
                   style={[
                     styles.chip,
-                    { backgroundColor: C.sunken, borderColor: C.line },
-                    form.paidBy === '' && { backgroundColor: C.ink, borderColor: C.ink },
+                    { backgroundColor: C.surface, borderColor: C.line },
+                    active && { backgroundColor: C.ink, borderColor: C.ink },
                   ]}>
                   <Text
                     style={[
                       styles.chipText,
-                      { color: form.paidBy === '' ? C.onInk : C.ink2 },
+                      { color: active ? C.onInk : C.ink2 },
                     ]}>
-                    You (Admin)
+                    {c}
                   </Text>
                 </Pressable>
-                {members.map((m) => {
-                  const active = form.paidBy === m.id;
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={T.micro}>Paid by</Text>
+          <View style={styles.chipsWrap}>
+            <Pressable
+              onPress={() => {
+                hapticLight();
+                update({ paidBy: '' });
+              }}
+              style={[
+                styles.chip,
+                { backgroundColor: C.surface, borderColor: C.line },
+                form.paidBy === '' && { backgroundColor: C.ink, borderColor: C.ink },
+              ]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: form.paidBy === '' ? C.onInk : C.ink2 },
+                ]}>
+                You (Admin)
+              </Text>
+            </Pressable>
+            {members.map((m) => {
+              const active = form.paidBy === m.id;
+              return (
+                <Pressable
+                  key={m.id}
+                  onPress={() => {
+                    hapticLight();
+                    update({ paidBy: m.id });
+                  }}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: C.surface, borderColor: C.line },
+                    active && { backgroundColor: C.ink, borderColor: C.ink },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? C.onInk : C.ink2 },
+                    ]}>
+                    {m.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {members.length > 0 && (
+          <View style={styles.field}>
+            <View style={styles.splitHeaderRow}>
+              <Text style={T.micro}>Split</Text>
+              <View style={[styles.modeToggle, { backgroundColor: C.sunken, borderColor: C.line }]}>
+                {(['equal', 'custom'] as const).map((m) => {
+                  const active = form.mode === m;
                   return (
                     <Pressable
-                      key={m.id}
-                      onPress={() => {
-                        hapticLight();
-                        update({ paidBy: m.id });
-                      }}
+                      key={m}
+                      onPress={() => switchMode(m)}
                       style={[
-                        styles.chip,
-                        { backgroundColor: C.sunken, borderColor: C.line },
-                        active && { backgroundColor: C.ink, borderColor: C.ink },
+                        styles.modeBtn,
+                        active && { backgroundColor: C.surface },
                       ]}>
                       <Text
                         style={[
-                          styles.chipText,
-                          { color: active ? C.onInk : C.ink2 },
+                          styles.modeBtnText,
+                          { color: active ? C.ink : C.muted },
                         ]}>
-                        {m.name}
+                        {m === 'equal' ? 'Equal' : 'Custom'}
                       </Text>
                     </Pressable>
                   );
@@ -446,439 +499,427 @@ export function ExpenseFormModal() {
               </View>
             </View>
 
-            {members.length > 0 && (
-              <View style={styles.field}>
-                <View style={styles.splitHeaderRow}>
-                  <Text style={T.micro}>Participants and shares</Text>
-                  <View style={[styles.modeToggle, { backgroundColor: C.sunken }]}>
-                    {(['equal', 'custom'] as const).map((m) => {
-                      const active = form.mode === m;
-                      return (
-                        <Pressable
-                          key={m}
-                          onPress={() => switchMode(m)}
-                          style={[
-                            styles.modeBtn,
-                            active && { backgroundColor: C.surface },
-                          ]}>
-                          <Text
-                            style={[
-                              styles.modeBtnText,
-                              { color: active ? C.ink : C.muted },
-                            ]}>
-                            {m === 'equal' ? 'Equal split' : 'Custom split'}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+            <View style={styles.quickSelectRow}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  hapticLight();
+                  update({
+                    includeUser: true,
+                    selected: Object.fromEntries(members.map((m) => [m.id, true])),
+                  });
+                }}
+                style={styles.quickSelectBtn}>
+                <Text style={[styles.quickSelectText, { color: C.ink }]}>Select all</Text>
+              </Pressable>
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  hapticLight();
+                  update({ selected: {} });
+                }}
+                style={styles.quickSelectBtn}>
+                <Text style={[styles.quickSelectMutedText, { color: C.muted }]}>Clear</Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.participantBox, { borderColor: C.line, backgroundColor: C.surface }]}>
+              {/* You row */}
+              <View style={[styles.participantRow, { backgroundColor: C.paper }]}>
+                <Pressable
+                  onPress={() => {
+                    hapticLight();
+                    update({
+                      includeUser: !form.includeUser,
+                      userCustom: !form.includeUser && !form.userCustom ? '' : form.userCustom,
+                    });
+                  }}
+                  style={styles.participantLeft}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      { borderColor: C.lineStrong, backgroundColor: C.surface },
+                      form.includeUser && { backgroundColor: C.ink, borderColor: C.ink },
+                    ]}>
+                    {form.includeUser && <IconCheck size={13} color={C.onInk} />}
                   </View>
-                </View>
-
-                <View style={styles.quickSelectRow}>
-                  <Pressable
-                    onPress={() => {
-                      hapticLight();
-                      update({
-                        includeUser: true,
-                        selected: Object.fromEntries(members.map((m) => [m.id, true])),
-                      });
-                    }}
-                    style={styles.quickSelectBtn}>
-                    <Text style={[styles.quickSelectText, { color: C.paid }]}>Select all</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      hapticLight();
-                      update({ selected: {} });
-                    }}
-                    style={styles.quickSelectBtn}>
-                    <Text style={[styles.quickSelectMutedText, { color: C.muted }]}>Clear</Text>
-                  </Pressable>
-                </View>
-
-                <View style={[styles.participantBox, { borderColor: C.line }]}>
-                  {/* You row */}
-                  <View style={[styles.participantRow, { backgroundColor: C.paper }]}>
-                    <Pressable
-                      onPress={() => {
-                        hapticLight();
-                        update({
-                          includeUser: !form.includeUser,
-                          userCustom: !form.includeUser && !form.userCustom ? '' : form.userCustom,
-                        });
-                      }}
-                      style={styles.participantLeft}>
-                      <View
-                        style={[
-                          styles.checkbox,
-                          { borderColor: C.lineStrong, backgroundColor: C.surface },
-                          form.includeUser && { backgroundColor: C.ink, borderColor: C.ink },
-                        ]}>
-                        {form.includeUser && <IconCheck size={12} color={C.onInk} />}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={T.bodyStrong}>You</Text>
-                        {form.includeUser && (
-                          <Text style={[styles.participantHint, { color: C.muted }]}>
-                            Included in split (not owed)
-                          </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={T.bodyStrong}>You</Text>
+                    {form.includeUser && (
+                      <Text style={[styles.participantHint, { color: C.muted }]}>
+                        Your own share
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+                {form.includeUser &&
+                  (form.mode === 'equal' ? (
+                    <Text style={[styles.shareReadout, { color: C.ink }]}>
+                      {userShareCents ? formatPHP(userShareCents) : '—'}
+                    </Text>
+                  ) : (
+                    <View style={styles.customInputWrap}>
+                      {totalCents !== null &&
+                        diff !== 0 &&
+                        (userShareCents ?? 0) + diff > 0 && (
+                          <Pressable
+                            onPress={fillRemainingForUser}
+                            style={[
+                              styles.fillRestBtn,
+                              { backgroundColor: C.sunken, borderColor: C.line },
+                            ]}>
+                            <Text style={[styles.fillRestText, { color: C.ink }]}>Fill</Text>
+                          </Pressable>
                         )}
-                      </View>
-                    </Pressable>
-                    {form.includeUser &&
-                      (form.mode === 'equal' ? (
-                        <Text style={[styles.shareReadout, { color: C.ink }]}>
-                          {userShareCents ? formatPHP(userShareCents) : '—'}
-                        </Text>
-                      ) : (
-                        <View style={styles.customInputWrap}>
-                          {totalCents !== null &&
-                            diff !== 0 &&
-                            (userShareCents ?? 0) + diff > 0 && (
+                      <TextInput
+                        value={form.userCustom}
+                        onChangeText={(v) => update({ userCustom: v })}
+                        keyboardType="decimal-pad"
+                        inputAccessoryViewID={EXPENSE_AMOUNT_ACCESSORY_ID}
+                        placeholder="0.00"
+                        placeholderTextColor={C.faint}
+                        style={[styles.shareInput, inputTheme]}
+                      />
+                    </View>
+                  ))}
+              </View>
+
+              {members.map((m) => {
+                const checked = Boolean(form.selected[m.id]);
+                const cents = shareCents[m.id];
+                const canFillRest =
+                  checked &&
+                  form.mode === 'custom' &&
+                  totalCents !== null &&
+                  diff !== 0 &&
+                  (cents ?? 0) + diff > 0;
+
+                return (
+                  <React.Fragment key={m.id}>
+                    <View style={[styles.divider, { backgroundColor: C.line }]} />
+                    <View style={styles.participantRow}>
+                      <Pressable
+                        onPress={() => toggleMember(m.id)}
+                        style={styles.participantLeft}>
+                        <View
+                          style={[
+                            styles.checkbox,
+                            { borderColor: C.lineStrong, backgroundColor: C.surface },
+                            checked && { backgroundColor: C.ink, borderColor: C.ink },
+                          ]}>
+                          {checked && <IconCheck size={13} color={C.onInk} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={T.bodyStrong} numberOfLines={1}>
+                            {m.name}
+                          </Text>
+                          {form.paidBy === m.id && checked && (
+                            <Text style={[styles.participantHint, { color: C.muted }]}>
+                              Paid the bill (not owed)
+                            </Text>
+                          )}
+                        </View>
+                      </Pressable>
+                      {checked &&
+                        (form.mode === 'equal' ? (
+                          <Text style={[styles.shareReadout, { color: C.ink }]}>
+                            {cents ? formatPHP(cents) : '—'}
+                          </Text>
+                        ) : (
+                          <View style={styles.customInputWrap}>
+                            {canFillRest && (
                               <Pressable
-                                onPress={fillRemainingForUser}
+                                onPress={() => fillRemainingForMember(m.id)}
                                 style={[
                                   styles.fillRestBtn,
                                   { backgroundColor: C.sunken, borderColor: C.line },
                                 ]}>
-                                <Text style={[styles.fillRestText, { color: C.ink2 }]}>Fill</Text>
+                                <Text style={[styles.fillRestText, { color: C.ink }]}>
+                                  Fill
+                                </Text>
                               </Pressable>
                             )}
-                          <TextInput
-                            value={form.userCustom}
-                            onChangeText={(v) => update({ userCustom: v })}
-                            keyboardType="decimal-pad"
-                            placeholder="0.00"
-                            placeholderTextColor={C.faint}
-                            style={[styles.shareInput, inputTheme]}
-                          />
-                        </View>
-                      ))}
-                  </View>
+                            <TextInput
+                              value={form.custom[m.id] ?? ''}
+                              onChangeText={(v) =>
+                                update({ custom: { ...form.custom, [m.id]: v } })
+                              }
+                              keyboardType="decimal-pad"
+                              inputAccessoryViewID={EXPENSE_AMOUNT_ACCESSORY_ID}
+                              placeholder="0.00"
+                              placeholderTextColor={C.faint}
+                              style={[styles.shareInput, inputTheme]}
+                            />
+                          </View>
+                        ))}
+                    </View>
+                  </React.Fragment>
+                );
+              })}
+            </View>
 
-                  {members.map((m) => {
-                    const checked = Boolean(form.selected[m.id]);
-                    const cents = shareCents[m.id];
-                    const canFillRest =
-                      checked &&
-                      form.mode === 'custom' &&
-                      totalCents !== null &&
-                      diff !== 0 &&
-                      (cents ?? 0) + diff > 0;
-
-                    return (
-                      <React.Fragment key={m.id}>
-                        <View style={[styles.divider, { backgroundColor: C.line }]} />
-                        <View style={styles.participantRow}>
-                          <Pressable
-                            onPress={() => toggleMember(m.id)}
-                            style={styles.participantLeft}>
-                            <View
-                              style={[
-                                styles.checkbox,
-                                { borderColor: C.lineStrong, backgroundColor: C.surface },
-                                checked && { backgroundColor: C.ink, borderColor: C.ink },
-                              ]}>
-                              {checked && <IconCheck size={12} color={C.onInk} />}
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={T.bodyStrong} numberOfLines={1}>
-                                {m.name}
-                              </Text>
-                              {form.paidBy === m.id && checked && (
-                                <Text style={[styles.participantHint, { color: C.muted }]}>
-                                  Paid the bill (not owed)
-                                </Text>
-                              )}
-                            </View>
-                          </Pressable>
-                          {checked &&
-                            (form.mode === 'equal' ? (
-                              <Text style={[styles.shareReadout, { color: C.ink }]}>
-                                {cents ? formatPHP(cents) : '—'}
-                              </Text>
-                            ) : (
-                              <View style={styles.customInputWrap}>
-                                {canFillRest && (
-                                  <Pressable
-                                    onPress={() => fillRemainingForMember(m.id)}
-                                    style={[
-                                      styles.fillRestBtn,
-                                      { backgroundColor: C.sunken, borderColor: C.line },
-                                    ]}>
-                                    <Text style={[styles.fillRestText, { color: C.ink2 }]}>
-                                      Fill
-                                    </Text>
-                                  </Pressable>
-                                )}
-                                <TextInput
-                                  value={form.custom[m.id] ?? ''}
-                                  onChangeText={(v) =>
-                                    update({ custom: { ...form.custom, [m.id]: v } })
-                                  }
-                                  keyboardType="decimal-pad"
-                                  placeholder="0.00"
-                                  placeholderTextColor={C.faint}
-                                  style={[styles.shareInput, inputTheme]}
-                                />
-                              </View>
-                            ))}
-                        </View>
-                      </React.Fragment>
-                    );
-                  })}
+            {mismatch && totalCents !== null && (
+              <View
+                style={[
+                  styles.mismatchBox,
+                  { backgroundColor: C.dangerSoft, borderColor: C.dangerBorder },
+                ]}>
+                <View style={styles.mismatchHead}>
+                  <IconAlertCircle size={16} color={C.danger} />
+                  <Text style={[styles.mismatchTitle, { color: C.danger }]}>
+                    Shares total {formatPHP(sharesTotal)} vs bill {formatPHP(totalCents)}
+                  </Text>
                 </View>
-
-                {mismatch && totalCents !== null && (
-                  <View
-                    style={[
-                      styles.mismatchBox,
-                      { backgroundColor: C.partialSoft, borderColor: C.partialBorder },
-                    ]}>
-                    <Text style={[styles.mismatchTitle, { color: C.partial }]}>
-                      Shares add up to {formatPHP(sharesTotal)}, but total is {formatPHP(totalCents)}.
-                    </Text>
-                    <Text style={[styles.mismatchSub, { color: C.partial }]}>
-                      {diff > 0
-                        ? `${formatPHP(diff)} is not assigned yet — tap "Fill" on any row to balance.`
-                        : `The shares are ${formatPHP(-diff)} over.`}
-                    </Text>
-                    <Pressable onPress={() => update({ mode: 'equal' })}>
-                      <Text style={[styles.mismatchLink, { color: C.partial }]}>
-                        Switch back to equal split
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
+                <Text style={[styles.mismatchSub, { color: C.ink2 }]}>
+                  {diff > 0
+                    ? `${formatPHP(diff)} unassigned — tap Fill on any row to balance.`
+                    : `Shares exceed the bill by ${formatPHP(-diff)}.`}
+                </Text>
+                <Pressable hitSlop={6} onPress={() => update({ mode: 'equal' })}>
+                  <Text style={[styles.mismatchLink, { color: C.ink }]}>
+                    Switch back to equal split
+                  </Text>
+                </Pressable>
               </View>
             )}
-
-            <View style={styles.field}>
-              <Text style={T.micro}>Notes (optional)</Text>
-              <TextInput
-                value={form.notes}
-                onChangeText={(v) => update({ notes: v })}
-                maxLength={1000}
-                multiline
-                numberOfLines={2}
-                placeholder="Optional notes"
-                placeholderTextColor={C.faint}
-                style={[styles.input, inputTheme, styles.textarea]}
-              />
-            </View>
-
-            {error ? <Text style={[styles.errorText, { color: C.owed }]}>{error}</Text> : null}
-          </ScrollView>
-
-          {/* Sticky Live Split Summary Bar */}
-          {splitSummary && (
-            <View
-              style={[
-                styles.stickyStatusBar,
-                {
-                  backgroundColor:
-                    splitSummary.tone === 'paid'
-                      ? C.paidSoft
-                      : splitSummary.tone === 'owed'
-                        ? C.owedSoft
-                        : splitSummary.tone === 'partial'
-                          ? C.partialSoft
-                          : C.paper,
-                  borderTopColor: C.line,
-                },
-              ]}>
-              <Text
-                style={[
-                  styles.stickyStatusText,
-                  {
-                    color:
-                      splitSummary.tone === 'paid'
-                        ? C.paid
-                        : splitSummary.tone === 'owed'
-                          ? C.owed
-                          : splitSummary.tone === 'partial'
-                            ? C.partial
-                            : C.muted,
-                  },
-                ]}>
-                {splitSummary.label}
-              </Text>
-            </View>
-          )}
-
-          <View style={[styles.footer, { borderTopColor: C.line }]}>
-            <Pressable
-              disabled={pending}
-              onPress={closeExpenseForm}
-              style={({ pressed }) => [
-                styles.cancelBtn,
-                { borderColor: C.lineStrong },
-                pressed && { opacity: 0.8 },
-              ]}>
-              <Text style={[styles.cancelBtnText, { color: C.ink }]}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              disabled={pending || members.length === 0}
-              onPress={handleSubmit}
-              style={({ pressed }) => [
-                styles.submitBtn,
-                { backgroundColor: C.ink },
-                pressed && { opacity: 0.85 },
-                (pending || members.length === 0) && { opacity: 0.45 },
-              ]}>
-              {pending && (
-                <ActivityIndicator size="small" color={C.onInk} style={{ marginRight: 6 }} />
-              )}
-              <Text style={[styles.submitBtnText, { color: C.onInk }]}>
-                {editing ? 'Save changes' : 'Add expense'}
-              </Text>
-            </Pressable>
           </View>
+        )}
+
+        <View style={styles.field}>
+          <Text style={T.micro}>Notes (optional)</Text>
+          <TextInput
+            value={form.notes}
+            onChangeText={(v) => update({ notes: v })}
+            maxLength={1000}
+            multiline
+            numberOfLines={2}
+            placeholder="Optional notes"
+            placeholderTextColor={C.faint}
+            style={[styles.input, inputTheme, styles.textarea]}
+          />
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <ErrorBanner message={error} />
+      </ScrollView>
+
+      <NumericDoneBar nativeID={EXPENSE_AMOUNT_ACCESSORY_ID} />
+
+      {/* Live Split Status Strip */}
+      {splitSummary && (
+        <View
+          style={[
+            styles.stickyStatusBar,
+            {
+              backgroundColor:
+                splitSummary.state === 'balanced'
+                  ? C.paidSoft
+                  : splitSummary.state === 'error'
+                    ? C.dangerSoft
+                    : C.paper,
+              borderTopColor: C.line,
+            },
+          ]}>
+          <Text
+            style={[
+              styles.stickyStatusText,
+              {
+                color:
+                  splitSummary.state === 'balanced'
+                    ? C.paid
+                    : splitSummary.state === 'error'
+                      ? C.danger
+                      : C.ink2,
+              },
+            ]}>
+            {splitSummary.label}
+          </Text>
+        </View>
+      )}
+
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: C.line,
+            paddingBottom: Math.max(insets.bottom, bottomSafePad),
+          },
+        ]}>
+        <Pressable
+          disabled={pending || members.length === 0}
+          onPress={handleSubmit}
+          style={({ pressed }) => [
+            styles.submitBtn,
+            { backgroundColor: C.ink },
+            pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            (pending || members.length === 0) && { opacity: 0.4 },
+          ]}>
+          {pending && (
+            <ActivityIndicator size="small" color={C.onInk} style={{ marginRight: 8 }} />
+          )}
+          <Text style={[styles.submitBtnText, { color: C.onInk }]}>
+            {editing ? 'Save changes' : 'Save expense'}
+          </Text>
+        </Pressable>
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: R.xl,
-    borderTopRightRadius: R.xl,
-    maxHeight: '94%',
-    width: '100%',
-    maxWidth: 540,
-    alignSelf: 'center',
-    overflow: 'hidden',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
-  },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 4,
     paddingBottom: 14,
     borderBottomWidth: 1,
+    gap: 12,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 13,
     marginTop: 2,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: R.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   body: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 18,
   },
   noMembersNotice: {
     borderWidth: 1,
-    padding: 14,
-    borderRadius: R.md,
-    gap: 10,
+    padding: 16,
+    borderRadius: R.lg,
+    gap: 12,
   },
   noMembersText: {
     fontSize: 13.5,
+    lineHeight: 20,
   },
   addMemberLinkBtn: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: R.sm,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: R.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addMemberLinkText: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '600',
   },
-  field: {
+  heroAmountBox: {
+    borderRadius: R.lg,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
     gap: 6,
   },
-  row2: {
+  heroAmountEyebrow: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+  },
+  heroAmountRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    gap: 4,
+  },
+  heroCurrencySign: {
+    fontSize: 24,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  heroAmountInput: {
+    fontWeight: '700',
+    letterSpacing: -1.1,
+    minWidth: 120,
+    flexShrink: 1,
+    textAlign: 'center',
+    paddingVertical: 4,
+    ...tabular,
+  },
+  field: {
+    gap: 8,
   },
   input: {
-    height: 44,
+    minHeight: METRICS.touchMin,
     borderRadius: R.md,
     borderWidth: 1,
     paddingHorizontal: 14,
     fontSize: 15,
   },
   textarea: {
-    height: 70,
-    paddingTop: 10,
+    height: 76,
+    paddingTop: 12,
     textAlignVertical: 'top',
   },
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 7,
+    gap: 8,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    minHeight: 40,
+    paddingHorizontal: 14,
     borderRadius: R.sm,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: 13.5,
+    fontWeight: '500',
   },
   splitHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   modeToggle: {
     flexDirection: 'row',
     borderRadius: R.sm,
-    padding: 2,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
   },
   modeBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 6,
   },
   modeBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   quickSelectRow: {
     flexDirection: 'row',
-    gap: 14,
-    marginVertical: 2,
+    gap: 18,
   },
   quickSelectBtn: {
     paddingVertical: 4,
   },
   quickSelectText: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '600',
   },
   quickSelectMutedText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: 13.5,
+    fontWeight: '500',
   },
   participantBox: {
     borderRadius: R.lg,
@@ -891,31 +932,32 @@ const styles = StyleSheet.create({
   participantRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    minHeight: 60,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 10,
   },
   participantLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    gap: 12,
+    minWidth: 0,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   participantHint: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     marginTop: 1,
   },
   shareReadout: {
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontWeight: '600',
     ...tabular,
   },
@@ -925,20 +967,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fillRestBtn: {
-    height: 30,
-    paddingHorizontal: 8,
+    height: 38,
+    paddingHorizontal: 11,
     borderRadius: R.sm,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fillRestText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
   shareInput: {
-    width: 92,
-    height: 36,
+    width: 96,
+    height: 40,
     borderRadius: R.sm,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -948,65 +990,57 @@ const styles = StyleSheet.create({
   },
   mismatchBox: {
     borderWidth: 1,
-    borderRadius: R.md,
-    padding: 12,
-    gap: 4,
+    borderRadius: R.lg,
+    padding: 14,
+    gap: 8,
+  },
+  mismatchHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   mismatchTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '600',
+    flex: 1,
+    ...tabular,
   },
   mismatchSub: {
-    fontSize: 12.5,
+    fontSize: 13,
+    lineHeight: 19,
   },
   mismatchLink: {
-    fontSize: 12.5,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '600',
     textDecorationLine: 'underline',
-    marginTop: 4,
-  },
-  errorText: {
-    fontSize: 13,
+    marginTop: 2,
   },
   stickyStatusBar: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderTopWidth: 1,
     alignItems: 'center',
   },
   stickyStatusText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     ...tabular,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
     paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: bottomSafePad,
     borderTopWidth: 1,
   },
-  cancelBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: R.md,
-    borderWidth: 1,
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   submitBtn: {
+    height: METRICS.buttonHeight,
+    borderRadius: R.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: R.md,
+    justifyContent: 'center',
   },
   submitBtnText: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
 });

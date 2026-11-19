@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ErrorBanner } from '@/components/mobile-ui';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
 import { R } from '@/design/tokens';
@@ -147,7 +148,7 @@ export default function RegisterScreen() {
                 />
               </View>
 
-              {error ? <Text style={[styles.errorText, { color: C.owed }]}>{error}</Text> : null}
+              <ErrorBanner message={error} />
 
               <Pressable
                 disabled={pending}

@@ -19,7 +19,7 @@ import {
 } from '@/components/mobile-ui';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
-import { R, tabular } from '@/design/tokens';
+import { METRICS, R, tabular } from '@/design/tokens';
 import { settleMember } from '@/lib/actions';
 import { formatDate, shortDate, todayISO } from '@/lib/dates';
 import { hapticLight } from '@/lib/haptics';
@@ -85,7 +85,7 @@ export default function MemberDetailScreen() {
   return (
     <MobileScreenWrapper>
       <View style={styles.stack}>
-        {/* Header */}
+        {/* Member Header */}
         <View style={styles.headerRow}>
           <View style={styles.memberHeadLeft}>
             <Avatar name={member.name} id={member.id} size="lg" />
@@ -119,31 +119,57 @@ export default function MemberDetailScreen() {
           </View>
         </View>
 
-        {/* Statement summary card */}
-        <View
-          style={[
-            styles.statementCard,
-            { backgroundColor: C.surface, borderColor: C.line },
-          ]}>
-          <Text style={T.micro}>
+        {/* Flat Hero Balance + Emerald Payoff Bar + 2-Column Hairline Strip */}
+        <View style={styles.heroBlock}>
+          <Text style={[styles.heroLabel, { color: C.muted }]}>
             {member.balanceCents < 0 ? 'Credit (overpaid)' : 'Outstanding balance'}
           </Text>
           <View style={{ marginTop: 6 }}>
-            <BigMoney cents={Math.abs(member.balanceCents)} size={38} />
+            <BigMoney cents={Math.abs(member.balanceCents)} size={42} />
           </View>
 
-          <View style={{ marginTop: 14 }}>
+          <View style={styles.progressWrap}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: C.muted }]}>Payoff progress</Text>
+              <Text
+                style={[
+                  styles.progressPct,
+                  { color: paidPct > 0 ? C.paid : C.muted },
+                ]}>
+                {Math.round(paidPct)}% paid
+              </Text>
+            </View>
             <SplitBar value={paidPct} />
           </View>
 
-          <View style={styles.progressReadout}>
-            <View style={styles.progressItem}>
-              <Text style={T.micro}>Paid back</Text>
-              <Text style={[T.amount, { color: C.paid }]}>{formatPHP(member.paidCents)}</Text>
+          <View
+            style={[
+              styles.metricStrip,
+              { backgroundColor: C.surface, borderColor: C.line },
+            ]}>
+            <View style={styles.metricCell}>
+              <Text style={[styles.metricLabel, { color: C.muted }]}>Paid back</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={[
+                  styles.metricValue,
+                  { color: member.paidCents > 0 ? C.paid : C.ink },
+                ]}>
+                {formatPHP(member.paidCents)}
+              </Text>
             </View>
-            <View style={[styles.progressItem, { alignItems: 'flex-end' }]}>
-              <Text style={T.micro}>Assigned</Text>
-              <Text style={T.amount}>{formatPHP(member.assignedCents)}</Text>
+            <View style={[styles.metricDivider, { backgroundColor: C.line }]} />
+            <View style={styles.metricCell}>
+              <Text style={[styles.metricLabel, { color: C.muted }]}>Assigned</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={[styles.metricValue, { color: C.ink }]}>
+                {formatPHP(member.assignedCents)}
+              </Text>
             </View>
           </View>
         </View>
@@ -158,9 +184,9 @@ export default function MemberDetailScreen() {
               style={({ pressed }) => [
                 styles.primaryBtnInk,
                 { backgroundColor: C.ink },
-                pressed && { opacity: 0.88 },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] },
               ]}>
-              <IconCheck size={13} color={C.onInk} strokeWidth={2.2} />
+              <IconCheck size={14} color={C.onInk} strokeWidth={2.2} />
               <Text style={[styles.primaryBtnInkText, { color: C.onInk }]}>Settle all</Text>
             </Pressable>
             <Pressable
@@ -170,8 +196,8 @@ export default function MemberDetailScreen() {
               }}
               style={({ pressed }) => [
                 styles.primaryBtnWhite,
-                { backgroundColor: C.surface, borderColor: C.lineStrong },
-                pressed && { backgroundColor: C.sunken },
+                { backgroundColor: C.surface, borderColor: C.line },
+                pressed && { backgroundColor: C.sunken, transform: [{ scale: 0.985 }] },
               ]}>
               <Text style={[styles.primaryBtnWhiteText, { color: C.ink }]}>Record payment</Text>
             </Pressable>
@@ -215,14 +241,15 @@ export default function MemberDetailScreen() {
                   </View>
                   {s.remainingCents > 0 && !s.isPayer && (
                     <Pressable
+                      hitSlop={4}
                       onPress={() => {
                         hapticLight();
                         openPaymentForm({ memberId: member.id, shareId: s.id });
                       }}
                       style={({ pressed }) => [
                         styles.payPillBtn,
-                        { backgroundColor: C.sunken, borderColor: C.line },
-                        pressed && { opacity: 0.8 },
+                        { backgroundColor: C.surface, borderColor: C.line },
+                        pressed && { backgroundColor: C.sunken },
                       ]}>
                       <Text style={[styles.payPillText, { color: C.ink }]}>Pay</Text>
                     </Pressable>
@@ -280,7 +307,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
@@ -293,88 +320,132 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.66,
   },
   memberMeta: {
-    fontSize: 12.5,
+    fontSize: 13,
     marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   editTextIcon: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '600',
   },
-  statementCard: {
-    borderRadius: R.lg,
-    padding: 18,
-    borderWidth: 1,
+  heroBlock: {
+    paddingTop: 2,
   },
-  progressReadout: {
-    marginTop: 12,
+  heroLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  progressWrap: {
+    marginTop: 18,
+    gap: 8,
+  },
+  progressHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  progressItem: {
-    gap: 2,
+  progressLabel: {
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+  progressPct: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    ...tabular,
+  },
+  metricStrip: {
+    marginTop: 14,
+    borderRadius: R.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    overflow: 'hidden',
+  },
+  metricCell: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 4,
+  },
+  metricDivider: {
+    width: 1,
+  },
+  metricLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    ...tabular,
   },
   actionsGrid: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: -6,
   },
   primaryBtnInk: {
     flex: 1,
-    height: 44,
-    borderRadius: R.md,
+    height: METRICS.buttonHeight,
+    borderRadius: R.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 8,
   },
   primaryBtnInkText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   primaryBtnWhite: {
     flex: 1,
-    height: 44,
-    borderRadius: R.md,
+    height: METRICS.buttonHeight,
+    borderRadius: R.lg,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnWhiteText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   shareRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    minHeight: METRICS.rowMinHeight,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 12,
   },
   rowSubtitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     marginTop: 2,
+    ...tabular,
   },
   payPillBtn: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    height: 40,
+    minWidth: 54,
+    paddingHorizontal: 14,
     borderRadius: R.sm,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   payPillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   positiveAmount: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '600',
     ...tabular,
   },

@@ -38,7 +38,8 @@ export function SwipeableRow({
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
 
-  const actionBg = actionTone === 'paid' ? C.paid : C.owed;
+  const actionBg = actionTone === 'paid' ? C.paidStrong : C.danger;
+  const actionTextColor = '#FFFFFF';
 
   const triggerAction = () => {
     hapticLight();
@@ -93,7 +94,7 @@ export function SwipeableRow({
           onPress={handleActionPress}
           style={[styles.actionBtn, { width: ACTION_WIDTH }]}>
           {actionIcon}
-          <Text style={styles.actionLabel}>{actionLabel}</Text>
+          <Text style={[styles.actionLabel, { color: actionTextColor }]}>{actionLabel}</Text>
         </Pressable>
       </Animated.View>
 

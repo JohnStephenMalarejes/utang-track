@@ -377,7 +377,7 @@ export default function ReportsScreen() {
                           {selectedPeriod.count === 1 ? 'bill' : 'bills'}
                         </Text>
                       </View>
-                      <Text style={[styles.calloutAmount, { color: C.owed }]}>
+                      <Text style={[styles.calloutAmount, { color: C.ink }]}>
                         {formatPHP(selectedPeriod.totalCents)}
                       </Text>
                     </View>
@@ -405,8 +405,8 @@ export default function ReportsScreen() {
                                   styles.barFill,
                                   {
                                     height: `${pct}%`,
-                                    backgroundColor: active ? C.owed : C.ink,
-                                    opacity: dimmed ? 0.35 : 1,
+                                    backgroundColor: active ? C.ink : C.ink2,
+                                    opacity: dimmed ? 0.28 : 1,
                                   },
                                 ]}
                               />
@@ -444,7 +444,7 @@ export default function ReportsScreen() {
                             <Text
                               style={[
                                 T.amount,
-                                selectedPeriodKey === r.key && { color: C.owed },
+                                selectedPeriodKey === r.key && { fontWeight: '700' },
                               ]}>
                               {formatPHP(r.totalCents)}
                             </Text>
@@ -472,7 +472,7 @@ export default function ReportsScreen() {
                   </View>
                   <View style={styles.collectionLegend}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View style={[styles.legendDot, { backgroundColor: C.paid }]} />
+                      <View style={[styles.legendDot, { backgroundColor: C.paidFill }]} />
                       <Text style={[styles.legendText, { color: C.ink }]}>
                         Settled: {formatPHP(settledCents)}
                       </Text>
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 3,
   },
   barLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     marginTop: 6,
     ...tabular,
   },

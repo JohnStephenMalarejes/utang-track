@@ -7,7 +7,6 @@ import {
   CategoryGlyph,
   ChipRow,
   ExportPillButton,
-  HeaderPlusButton,
   ListGroup,
   ListRow,
   MobileEmpty,
@@ -138,23 +137,20 @@ export default function ExpensesScreen() {
             : 'Shared bills and splits'
         }
         right={
-          <>
-            {filtered.length > 0 && (
-              <ExportPillButton
-                label="Export"
-                onPress={() =>
-                  exportLedgerSummaryPdf({
-                    filename: `debt-tracker-expenses-${todayISO()}.pdf`,
-                    shareTitle: 'Debt Tracker Expenses',
-                    members,
-                    expenses: filtered,
-                    allExpenses: expenses,
-                  })
-                }
-              />
-            )}
-            <HeaderPlusButton onPress={() => openExpenseForm(null)} />
-          </>
+          filtered.length > 0 ? (
+            <ExportPillButton
+              label="Export"
+              onPress={() =>
+                exportLedgerSummaryPdf({
+                  filename: `debt-tracker-expenses-${todayISO()}.pdf`,
+                  shareTitle: 'Debt Tracker Expenses',
+                  members,
+                  expenses: filtered,
+                  allExpenses: expenses,
+                })
+              }
+            />
+          ) : undefined
         }
       />
 
@@ -202,8 +198,8 @@ export default function ExpensesScreen() {
                 color={showFilters || extraFilterCount > 0 ? C.onInk : C.ink}
               />
               {extraFilterCount > 0 && (
-                <View style={[styles.filterBadge, { backgroundColor: C.owed }]}>
-                  <Text style={styles.filterBadgeText}>{extraFilterCount}</Text>
+                <View style={[styles.filterBadge, { backgroundColor: C.ink, borderColor: C.paper }]}>
+                  <Text style={[styles.filterBadgeText, { color: C.onInk }]}>{extraFilterCount}</Text>
                 </View>
               )}
             </Pressable>
@@ -359,8 +355,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterToggleBtn: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: R.md,
     borderWidth: 1,
     alignItems: 'center',
@@ -374,6 +370,7 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,

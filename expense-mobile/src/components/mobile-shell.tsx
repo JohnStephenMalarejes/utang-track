@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { usePathname, useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import {
@@ -12,8 +11,10 @@ import {
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  IconAlertCircle,
   IconCalendar,
   IconChart,
+  IconCheck,
   IconChevronLeft,
   IconHome,
   IconPlus,
@@ -28,7 +29,7 @@ import { MemberFormModal } from '@/components/modals/member-form-modal';
 import { PaymentFormModal } from '@/components/modals/payment-form-modal';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
-import { R, tabular } from '@/design/tokens';
+import { METRICS, R, tabular } from '@/design/tokens';
 import { hapticLight } from '@/lib/haptics';
 
 const TABS = [
@@ -38,19 +39,34 @@ const TABS = [
   { href: '/members' as const, match: '/members', label: 'People', Icon: IconUsers },
 ];
 
-export function MobileScreenWrapper({ children }: { children: React.ReactNode }) {
+export function MobileScreenWrapper({
+  children,
+  bleedTop = false,
+}: {
+  children: React.ReactNode;
+  bleedTop?: boolean;
+}) {
   const { refreshing, refresh } = useLedger();
   const { C } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
       style={[styles.screenScroll, { backgroundColor: C.paper }]}
-      contentContainerStyle={styles.screenContent}
+      contentContainerStyle={[
+        styles.screenContent,
+        bleedTop && styles.screenContentBleed,
+        { paddingBottom: Math.max(insets.bottom, 12) + 88 },
+      ]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => refresh(false)} tintColor={C.ink} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => refresh(false)}
+          tintColor={bleedTop ? C.heroText : C.ink}
+        />
       }>
-      <View style={styles.maxWidthContainer}>{children}</View>
+      {bleedTop ? children : <View style={styles.maxWidthContainer}>{children}</View>}
     </ScrollView>
   );
 }
@@ -81,7 +97,10 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
   }
 
   const initial = (user?.name || user?.email || 'A').trim().charAt(0).toUpperCase();
+  const isHome = pathname === '/' || pathname === '/index';
   const isMemberDetail = pathname.startsWith('/members/') && pathname !== '/members';
+  const isPayments = pathname === '/payments';
+  const isMembers = pathname === '/members';
   const isCalendar = pathname === '/calendar';
   const isReports = pathname === '/reports';
   const isSettings = pathname === '/settings';
@@ -97,6 +116,12 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
     router.replace(href);
   }
 
+  const topPill = isPayments
+    ? { label: 'Record payment', onPress: () => openPaymentForm(null) }
+    : isMembers
+      ? { label: 'Add person', onPress: () => openMemberForm(null) }
+      : { label: 'New expense', onPress: () => openExpenseForm(null) };
+
   const renderTab = (tab: (typeof TABS)[number]) => {
     const active = isActive(tab.match);
     const TabIcon = tab.Icon;
@@ -106,26 +131,28 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
     return (
       <Pressable
         key={tab.href}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
         onPress={() => handleTabPress(tab.href, tab.match)}
         style={styles.tabItem}>
-        <View style={[styles.tabRule, active && { backgroundColor: C.ink }]} />
         <View style={styles.tabIconWrap}>
-          <TabIcon size={18} color={active ? C.ink : C.faint} />
+          <TabIcon size={21} color={active ? C.forestInk : C.muted} />
           {showBadge && (
             <View
               style={[
                 styles.tabBadge,
-                { backgroundColor: C.owed, borderColor: C.surface },
+                { backgroundColor: C.forestInk, borderColor: C.surface },
               ]}>
-              <Text style={styles.tabBadgeText}>{badgeLabel}</Text>
+              <Text style={[styles.tabBadgeText, { color: C.onInk }]}>{badgeLabel}</Text>
             </View>
           )}
         </View>
         <Text
+          numberOfLines={1}
           style={[
             styles.tabLabel,
-            { color: active ? C.ink : C.muted },
-            active && { fontWeight: '700' },
+            { color: active ? C.forestInk : C.muted },
+            active && { fontWeight: '600' },
           ]}>
           {tab.label}
         </Text>
@@ -133,136 +160,183 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const isErrorToast = toast?.tone === 'error';
+
   return (
     <View style={[styles.root, { backgroundColor: C.paper }]}>
-      {/* Top App Bar */}
-      <View
-        style={[
-          styles.topBar,
-          {
-            paddingTop: Math.max(insets.top, 8),
-            backgroundColor: C.paper,
-            borderBottomColor: C.line,
-          },
-        ]}>
-        <View style={styles.topBarInner}>
-          {isMemberDetail ? (
-            <Pressable
-              onPress={() => {
-                hapticLight();
-                router.replace('/members');
-              }}
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.65 }]}>
-              <IconChevronLeft size={16} color={C.ink} strokeWidth={2} />
-              <Text style={[styles.backText, { color: C.ink }]}>People</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => {
-                hapticLight();
-                router.replace('/');
-              }}
-              style={({ pressed }) => [styles.brandRow, pressed && { opacity: 0.8 }]}>
-              <View
-                style={[
-                  styles.logoFrame,
-                  { backgroundColor: '#FFFFFF', borderColor: C.line },
-                ]}>
-                <Image
-                  source={require('@/assets/images/logo-mark.png')}
-                  style={styles.logoMark}
-                  contentFit="contain"
-                />
+      {/* Seamless Borderless Top Utility Bar (no dark bg, no gray underline) */}
+      {!isHome && (
+        <View
+          style={[
+            styles.cleanTopBar,
+            {
+              paddingTop: Math.max(insets.top, 14) + 6,
+              backgroundColor: C.paper,
+            },
+          ]}>
+          <View style={styles.cleanTopInner}>
+            {isMemberDetail ? (
+              <Pressable
+                onPress={() => {
+                  hapticLight();
+                  router.replace('/members');
+                }}
+                style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.65 }]}>
+                <IconChevronLeft size={18} color={C.ink} />
+                <Text style={[styles.backText, { color: C.ink }]}>People</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.utilityLeft}>
+                <Pressable
+                  accessibilityLabel="Calendar"
+                  onPress={() => {
+                    hapticLight();
+                    if (!isCalendar) router.push('/calendar');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityIconBtn,
+                    isCalendar && { backgroundColor: C.forestInk },
+                    pressed && !isCalendar && { backgroundColor: C.sunken },
+                  ]}>
+                  <IconCalendar size={20} color={isCalendar ? C.onInk : C.ink} />
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel="Reports"
+                  onPress={() => {
+                    hapticLight();
+                    if (!isReports) router.push('/reports');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityIconBtn,
+                    isReports && { backgroundColor: C.forestInk },
+                    pressed && !isReports && { backgroundColor: C.sunken },
+                  ]}>
+                  <IconChart size={20} color={isReports ? C.onInk : C.ink} />
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel="Profile and Settings"
+                  onPress={() => {
+                    hapticLight();
+                    if (!isSettings) router.push('/settings');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityAvatarBtn,
+                    {
+                      backgroundColor: isSettings ? C.forestInk : C.surface,
+                      borderColor: isSettings ? C.forestInk : C.lineStrong,
+                    },
+                    pressed && { opacity: 0.78 },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.utilityAvatarText,
+                      { color: isSettings ? C.onInk : C.ink },
+                    ]}>
+                    {initial}
+                  </Text>
+                </Pressable>
               </View>
-              <Text style={[styles.brandName, { color: C.ink }]}>
-                debt<Text style={[styles.brandAccent, { color: C.muted }]}> tracker</Text>
-              </Text>
-            </Pressable>
-          )}
+            )}
 
-          <View style={styles.topActions}>
-            <Pressable
-              accessibilityLabel="Calendar"
-              onPress={() => {
-                hapticLight();
-                router.push('/calendar');
-              }}
-              style={({ pressed }) => [
-                styles.headerIconBtn,
-                { backgroundColor: C.surface, borderColor: C.line },
-                isCalendar && { backgroundColor: C.ink, borderColor: C.ink },
-                pressed && { opacity: 0.8 },
-              ]}>
-              <IconCalendar size={16} color={isCalendar ? C.onInk : C.ink} />
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Reports"
-              onPress={() => {
-                hapticLight();
-                router.push('/reports');
-              }}
-              style={({ pressed }) => [
-                styles.headerIconBtn,
-                { backgroundColor: C.surface, borderColor: C.line },
-                isReports && { backgroundColor: C.ink, borderColor: C.ink },
-                pressed && { opacity: 0.8 },
-              ]}>
-              <IconChart size={16} color={isReports ? C.onInk : C.ink} />
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Settings"
-              onPress={() => {
-                hapticLight();
-                router.push('/settings');
-              }}
-              style={({ pressed }) => [
-                styles.headerAvatarBtn,
-                { backgroundColor: C.surface, borderColor: C.line },
-                isSettings && { backgroundColor: C.ink, borderColor: C.ink },
-                pressed && { opacity: 0.8 },
-              ]}>
-              <Text
-                style={[
-                  styles.headerAvatarText,
-                  { color: isSettings ? C.onInk : C.ink },
+            {isMemberDetail ? (
+              <View style={styles.utilityLeft}>
+                <Pressable
+                  accessibilityLabel="Calendar"
+                  onPress={() => {
+                    hapticLight();
+                    router.push('/calendar');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityIconBtn,
+                    pressed && { backgroundColor: C.sunken },
+                  ]}>
+                  <IconCalendar size={20} color={C.ink} />
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Reports"
+                  onPress={() => {
+                    hapticLight();
+                    router.push('/reports');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityIconBtn,
+                    pressed && { backgroundColor: C.sunken },
+                  ]}>
+                  <IconChart size={20} color={C.ink} />
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Profile and Settings"
+                  onPress={() => {
+                    hapticLight();
+                    router.push('/settings');
+                  }}
+                  style={({ pressed }) => [
+                    styles.utilityAvatarBtn,
+                    { backgroundColor: C.surface, borderColor: C.lineStrong },
+                    pressed && { opacity: 0.78 },
+                  ]}>
+                  <Text style={[styles.utilityAvatarText, { color: C.ink }]}>{initial}</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  hapticLight();
+                  topPill.onPress();
+                }}
+                style={({ pressed }) => [
+                  styles.topActionPill,
+                  {
+                    backgroundColor: C.surface,
+                    borderColor: C.paidFill,
+                  },
+                  pressed && { backgroundColor: C.paidSoft, transform: [{ scale: 0.97 }] },
                 ]}>
-                {initial}
-              </Text>
-            </Pressable>
+                <IconPlus size={14} color={C.forestInk} />
+                <Text style={[styles.topActionPillText, { color: C.forestInk }]}>
+                  {topPill.label}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
-      </View>
+      )}
 
       {/* Main Content */}
       <View style={styles.contentArea}>{children}</View>
 
-      {/* Animated Toast Notification */}
+      {/* High-Contrast Toast Notification (distinct error vs success) */}
       {toast && (
         <Animated.View
           key={toast.id}
-          entering={FadeInDown.duration(220)}
-          exiting={FadeOutDown.duration(180)}
+          entering={FadeInDown.duration(200)}
+          exiting={FadeOutDown.duration(160)}
           style={[
             styles.toastBanner,
             {
-              bottom: Math.max(insets.bottom, 12) + 70,
-              backgroundColor: toast.tone === 'error' ? C.owed : C.cardBg,
-              borderColor: toast.tone === 'error' ? C.owed : C.cardBorder,
+              bottom: Math.max(insets.bottom, 10) + 74,
+              backgroundColor: isErrorToast ? C.danger : C.ink,
+              borderColor: isErrorToast ? C.danger : C.inkBorder,
             },
           ]}>
+          {isErrorToast ? (
+            <IconAlertCircle size={16} color="#FFFFFF" />
+          ) : (
+            <IconCheck size={15} color={C.paidFill} />
+          )}
           <Text
             style={[
               styles.toastText,
-              { color: toast.tone === 'error' ? '#FFFFFF' : C.cardText },
+              { color: isErrorToast ? '#FFFFFF' : C.onInk },
             ]}>
             {toast.text}
           </Text>
         </Animated.View>
       )}
 
-      {/* Bottom Tab Bar */}
+      {/* Flat Native Bottom Tab Bar — 1px top hairline, deep forest active icons */}
       <View
         style={[
           styles.bottomBar,
@@ -283,11 +357,11 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
                 setCreateSheetOpen(true);
               }}
               style={({ pressed }) => [
-                styles.createFab,
-                { backgroundColor: C.ink },
-                pressed && { opacity: 0.88, transform: [{ scale: 0.94 }] },
+                styles.createTrigger,
+                { backgroundColor: C.forestInk },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] },
               ]}>
-              <IconPlus size={18} color={C.onInk} strokeWidth={2.2} />
+              <IconPlus size={20} color={C.onInk} />
             </Pressable>
           </View>
 
@@ -295,7 +369,7 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
         </View>
       </View>
 
-      {/* Global Create Sheet & Modals */}
+      {/* Global Create Bottom Sheet & Modals */}
       <ActionSheetModal
         open={createSheetOpen}
         onClose={() => setCreateSheetOpen(false)}
@@ -315,8 +389,8 @@ export function MobileShell({ children }: { children: React.ReactNode }) {
             onSelect: () => openPaymentForm(null),
           },
           {
-            label: 'Add member',
-            description: 'Someone you share bills with',
+            label: 'Add person',
+            description: 'Someone you share expenses with',
             code: 'MB',
             onSelect: () => openMemberForm(null),
           },
@@ -335,79 +409,71 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  topBar: {
-    borderBottomWidth: 1,
+  cleanTopBar: {
+    width: '100%',
+    paddingBottom: 6,
   },
-  topBarInner: {
-    height: 52,
-    paddingHorizontal: 16,
+  cleanTopInner: {
+    minHeight: 44,
+    paddingHorizontal: METRICS.screenPad,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    maxWidth: 680,
+    maxWidth: 640,
     width: '100%',
     alignSelf: 'center',
   },
-  brandRow: {
+  utilityLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 6,
   },
-  logoFrame: {
-    width: 28,
-    height: 28,
-    borderRadius: R.sm,
+  utilityIconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  utilityAvatarBtn: {
+    width: 36,
+    height: 36,
+    marginLeft: 4,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoMark: {
-    width: 20,
-    height: 20,
-  },
-  brandName: {
-    fontSize: 16,
+  utilityAvatarText: {
+    fontSize: 13.5,
     fontWeight: '700',
-    letterSpacing: -0.4,
   },
-  brandAccent: {
-    fontWeight: '400',
+  topActionPill: {
+    height: 38,
+    paddingHorizontal: 15,
+    borderRadius: R.pill,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  topActionPillText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingRight: 10,
+    minHeight: METRICS.touchMin,
+    gap: 6,
+    paddingRight: 12,
   },
   backText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '600',
-  },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: R.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAvatarBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: R.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAvatarText: {
-    fontSize: 13,
-    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   contentArea: {
     flex: 1,
@@ -416,9 +482,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   screenContent: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 112,
+    paddingHorizontal: METRICS.screenPad,
+    paddingTop: 12,
+  },
+  screenContentBleed: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   maxWidthContainer: {
     maxWidth: 640,
@@ -432,15 +501,20 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: R.md,
+    paddingVertical: 13,
+    borderRadius: R.lg,
     borderWidth: 1,
     zIndex: 100,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   toastText: {
     fontSize: 13.5,
     fontWeight: '600',
+    letterSpacing: -0.1,
+    flexShrink: 1,
   },
   bottomBar: {
     position: 'absolute',
@@ -450,28 +524,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   bottomBarInner: {
-    height: 58,
+    height: 62,
     flexDirection: 'row',
     alignItems: 'center',
     maxWidth: 520,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
   },
   tabItem: {
     flex: 1,
     height: '100%',
+    minWidth: METRICS.touchMin,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    position: 'relative',
-  },
-  tabRule: {
-    position: 'absolute',
-    top: 0,
-    width: 24,
-    height: 2,
-    backgroundColor: 'transparent',
+    gap: 3,
   },
   tabIconWrap: {
     position: 'relative',
@@ -479,35 +546,34 @@ const styles = StyleSheet.create({
   tabBadge: {
     position: 'absolute',
     top: -6,
-    right: -11,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    right: -13,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1.5,
-    paddingHorizontal: 3.5,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabBadgeText: {
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#FFFFFF',
     ...tabular,
   },
   tabLabel: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '500',
-    letterSpacing: 0.1,
+    letterSpacing: -0.1,
   },
   centerCreateSlot: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  createFab: {
-    width: 42,
-    height: 42,
-    borderRadius: R.md,
+  createTrigger: {
+    width: METRICS.touchMin,
+    height: METRICS.touchMin,
+    borderRadius: R.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },

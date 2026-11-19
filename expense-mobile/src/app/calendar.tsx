@@ -13,7 +13,8 @@ import {
   subMonths,
 } from 'date-fns';
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -23,6 +24,7 @@ import {
 import { MobileScreenWrapper } from '@/components/mobile-shell';
 import {
   BigMoney,
+  BottomSheet,
   ListGroup,
   ListRow,
   MobileEmpty,
@@ -32,7 +34,7 @@ import {
 import { CalendarDayModal } from '@/components/modals/calendar-day-modal';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
-import { R, tabular } from '@/design/tokens';
+import { bottomSafePad, METRICS, R, tabular } from '@/design/tokens';
 import { dayLabel } from '@/lib/dates';
 import { hapticLight } from '@/lib/haptics';
 import { formatPHP, sumCents } from '@/lib/money';
@@ -54,6 +56,7 @@ function formatCompactCellAmount(cents: number): string {
 
 export default function CalendarScreen() {
   const { C, T } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { calendarExpenses } = useLedger();
 
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(new Date()));
@@ -285,14 +288,14 @@ export default function CalendarScreen() {
                           numberOfLines={1}
                           style={[
                             styles.daySpendText,
-                            { color: inMonth ? C.owed : C.faint },
+                            { color: inMonth ? C.ink : C.faint },
                           ]}>
                           {formatCompactCellAmount(info.totalCents)}
                         </Text>
                         <View
                           style={[
                             styles.dayDot,
-                            { backgroundColor: inMonth ? C.owed : C.faint },
+                            { backgroundColor: inMonth ? C.ink : C.faint },
                           ]}
                         />
                       </View>
@@ -306,21 +309,21 @@ export default function CalendarScreen() {
           ))}
         </View>
 
-        {/* Below the calendar: Total amount for the whole month */}
+        {/* Clean Light Hairline Month Summary (no dark fake card) */}
         <View
           style={[
             styles.monthSummaryCard,
-            { backgroundColor: C.cardBg, borderColor: C.cardBorder },
+            { backgroundColor: C.surface, borderColor: C.line },
           ]}>
           <View style={styles.monthSummaryTop}>
-            <Text style={[styles.monthSummaryEyebrow, { color: C.cardMuted }]}>
+            <Text style={[styles.monthSummaryEyebrow, { color: C.muted }]}>
               MONTHLY TOTAL · {format(viewMonth, 'MMMM yyyy').toUpperCase()}
             </Text>
           </View>
           <View style={{ marginTop: 8 }}>
-            <BigMoney cents={monthTotalCents} size={36} light />
+            <BigMoney cents={monthTotalCents} size={38} />
           </View>
-          <Text style={[styles.monthSummarySub, { color: C.cardMuted }]}>
+          <Text style={[styles.monthSummarySub, { color: C.muted }]}>
             {monthExpenses.length > 0
               ? `${monthExpenses.length} ${monthExpenses.length === 1 ? 'expense' : 'expenses'} across ${activeDaysInMonth} ${activeDaysInMonth === 1 ? 'day' : 'days'}`
               : `No expenses recorded in ${format(viewMonth, 'MMMM yyyy')}`}
@@ -367,128 +370,122 @@ export default function CalendarScreen() {
         onClose={() => setSelectedDate(null)}
       />
 
-      {/* Month & Year Picker Modal */}
-      <Modal
-        visible={pickerOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerOpen(false)}>
-        <View style={[styles.pickerBackdrop, { backgroundColor: C.scrim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerOpen(false)} />
+      {/* Month & Year Picker Bottom Sheet */}
+      <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)}>
+        <View
+          style={[
+            styles.pickerSheetBody,
+            { paddingBottom: Math.max(insets.bottom, bottomSafePad) },
+          ]}>
+          <View style={styles.pickerHeader}>
+            <Text style={T.micro}>Jump to month & year</Text>
+            <Pressable
+              hitSlop={6}
+              onPress={() => setPickerOpen(false)}
+              style={[styles.pickerCloseBtn, { backgroundColor: C.sunken }]}>
+              <IconClose size={13} color={C.ink} />
+            </Pressable>
+          </View>
+
+          {/* Year Stepper */}
           <View
             style={[
-              styles.pickerCard,
-              { backgroundColor: C.surface, borderColor: C.line },
+              styles.yearRow,
+              { backgroundColor: C.paper, borderColor: C.line },
             ]}>
-            <View style={styles.pickerHeader}>
-              <Text style={T.micro}>Jump to month & year</Text>
-              <Pressable
-                onPress={() => setPickerOpen(false)}
-                style={[styles.pickerCloseBtn, { backgroundColor: C.sunken }]}>
-                <IconClose size={12} color={C.ink2} />
-              </Pressable>
-            </View>
-
-            {/* Year Stepper */}
-            <View
-              style={[
-                styles.yearRow,
-                { backgroundColor: C.paper, borderColor: C.line },
+            <Pressable
+              accessibilityLabel="Previous year"
+              onPress={() => setPickerYear((y) => y - 1)}
+              style={({ pressed }) => [
+                styles.yearArrowBtn,
+                { backgroundColor: C.surface, borderColor: C.line },
+                pressed && { backgroundColor: C.sunken },
               ]}>
-              <Pressable
-                accessibilityLabel="Previous year"
-                onPress={() => setPickerYear((y) => y - 1)}
-                style={({ pressed }) => [
-                  styles.yearArrowBtn,
-                  { backgroundColor: C.surface, borderColor: C.line },
-                  pressed && { backgroundColor: C.sunken },
-                ]}>
-                <IconChevronLeft size={15} color={C.ink} strokeWidth={2} />
-              </Pressable>
-              <Text style={[styles.yearValue, { color: C.ink }]}>{pickerYear}</Text>
-              <Pressable
-                accessibilityLabel="Next year"
-                onPress={() => setPickerYear((y) => y + 1)}
-                style={({ pressed }) => [
-                  styles.yearArrowBtn,
-                  { backgroundColor: C.surface, borderColor: C.line },
-                  pressed && { backgroundColor: C.sunken },
-                ]}>
-                <IconChevronRight size={15} color={C.ink} strokeWidth={2} />
-              </Pressable>
-            </View>
+              <IconChevronLeft size={15} color={C.ink} strokeWidth={1.8} />
+            </Pressable>
+            <Text style={[styles.yearValue, { color: C.ink }]}>{pickerYear}</Text>
+            <Pressable
+              accessibilityLabel="Next year"
+              onPress={() => setPickerYear((y) => y + 1)}
+              style={({ pressed }) => [
+                styles.yearArrowBtn,
+                { backgroundColor: C.surface, borderColor: C.line },
+                pressed && { backgroundColor: C.sunken },
+              ]}>
+              <IconChevronRight size={15} color={C.ink} strokeWidth={1.8} />
+            </Pressable>
+          </View>
 
-            {activeYears.length > 1 && (
-              <View style={styles.quickYearsRow}>
-                {activeYears.map((yr) => {
-                  const active = yr === pickerYear;
-                  return (
-                    <Pressable
-                      key={yr}
-                      onPress={() => setPickerYear(yr)}
-                      style={[
-                        styles.yearChip,
-                        { backgroundColor: C.sunken, borderColor: C.line },
-                        active && { backgroundColor: C.ink, borderColor: C.ink },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.yearChipText,
-                          { color: active ? C.onInk : C.ink2 },
-                        ]}>
-                        {yr}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* 12-Month Grid */}
-            <View style={styles.monthGrid}>
-              {MONTH_NAMES.map((mName, idx) => {
-                const ym = `${pickerYear}-${String(idx + 1).padStart(2, '0')}`;
-                const mTotal = monthTotals.get(ym) || 0;
-                const isSelectedMonth = ym === currentMonthKey;
-
+          {activeYears.length > 1 && (
+            <View style={styles.quickYearsRow}>
+              {activeYears.map((yr) => {
+                const active = yr === pickerYear;
                 return (
                   <Pressable
-                    key={mName}
-                    onPress={() => selectMonthFromPicker(idx)}
-                    style={({ pressed }) => [
-                      styles.monthTile,
-                      { borderColor: C.line, backgroundColor: C.paper },
-                      isSelectedMonth && { backgroundColor: C.ink, borderColor: C.ink },
-                      pressed && { opacity: 0.8 },
+                    key={yr}
+                    onPress={() => setPickerYear(yr)}
+                    style={[
+                      styles.yearChip,
+                      { backgroundColor: C.sunken, borderColor: C.line },
+                      active && { backgroundColor: C.ink, borderColor: C.ink },
                     ]}>
                     <Text
                       style={[
-                        styles.monthTileName,
-                        { color: isSelectedMonth ? C.onInk : C.ink },
+                        styles.yearChipText,
+                        { color: active ? C.onInk : C.ink2 },
                       ]}>
-                      {mName}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.monthTileAmount,
-                        {
-                          color: isSelectedMonth
-                            ? C.onInkMuted
-                            : mTotal > 0
-                              ? C.owed
-                              : C.faint,
-                        },
-                      ]}>
-                      {mTotal > 0 ? formatCompactCellAmount(mTotal) : '—'}
+                      {yr}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
+          )}
+
+          {/* 12-Month Grid */}
+          <View style={styles.monthGrid}>
+            {MONTH_NAMES.map((mName, idx) => {
+              const ym = `${pickerYear}-${String(idx + 1).padStart(2, '0')}`;
+              const mTotal = monthTotals.get(ym) || 0;
+              const isSelectedMonth = ym === currentMonthKey;
+
+              return (
+                <Pressable
+                  key={mName}
+                  onPress={() => selectMonthFromPicker(idx)}
+                  style={({ pressed }) => [
+                    styles.monthTile,
+                    { borderColor: C.line, backgroundColor: C.paper },
+                    isSelectedMonth && { backgroundColor: C.ink, borderColor: C.ink },
+                    pressed && { opacity: 0.8 },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.monthTileName,
+                      { color: isSelectedMonth ? C.onInk : C.ink },
+                    ]}>
+                    {mName}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.monthTileAmount,
+                      {
+                        color: isSelectedMonth
+                          ? C.onInkMuted
+                          : mTotal > 0
+                            ? C.ink
+                            : C.muted,
+                      },
+                    ]}>
+                    {mTotal > 0 ? formatCompactCellAmount(mTotal) : '—'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-      </Modal>
+      </BottomSheet>
     </MobileScreenWrapper>
   );
 }
@@ -504,8 +501,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   navArrowBtn: {
-    width: 36,
-    height: 36,
+    width: METRICS.touchMin,
+    height: METRICS.touchMin,
     borderRadius: R.md,
     borderWidth: 1,
     alignItems: 'center',
@@ -515,15 +512,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    paddingHorizontal: 14,
-    height: 36,
+    paddingHorizontal: 16,
+    height: METRICS.touchMin,
     borderRadius: R.md,
     borderWidth: 1,
   },
   monthPickerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   navRightGroup: {
     flexDirection: 'row',
@@ -531,8 +528,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   todayBtn: {
-    height: 36,
-    paddingHorizontal: 11,
+    height: METRICS.touchMin,
+    paddingHorizontal: 12,
     borderRadius: R.md,
     borderWidth: 1,
     alignItems: 'center',
@@ -557,30 +554,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   weekdayLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
   },
   weekRow: {
     flexDirection: 'row',
   },
   dayCell: {
     flex: 1,
-    minHeight: 62,
+    minHeight: 64,
     paddingVertical: 7,
     paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   dayNumberBadge: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     borderRadius: R.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayNumberText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '600',
     ...tabular,
   },
@@ -589,7 +586,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   daySpendText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: -0.2,
     ...tabular,
@@ -626,18 +623,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     ...tabular,
   },
-  pickerBackdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  pickerCard: {
-    width: '100%',
-    maxWidth: 380,
-    borderRadius: R.lg,
-    borderWidth: 1,
-    padding: 18,
+  pickerSheetBody: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
     gap: 14,
   },
   pickerHeader: {
@@ -646,8 +634,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   pickerCloseBtn: {
-    width: 30,
-    height: 30,
+    width: 34,
+    height: 34,
     borderRadius: R.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -661,8 +649,8 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   yearArrowBtn: {
-    width: 34,
-    height: 34,
+    width: 38,
+    height: 38,
     borderRadius: R.sm,
     borderWidth: 1,
     alignItems: 'center',

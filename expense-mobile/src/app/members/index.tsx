@@ -9,7 +9,6 @@ import {
   Avatar,
   ConfirmModal,
   ExportPillButton,
-  HeaderPlusButton,
   ListGroup,
   MiniMeter,
   MobileEmpty,
@@ -92,22 +91,19 @@ export default function MembersScreen() {
             : 'People you split bills with'
         }
         right={
-          <>
-            {filtered.length > 0 && (
-              <ExportPillButton
-                label="Export"
-                onPress={() =>
-                  exportLedgerSummaryPdf({
-                    filename: `debt-tracker-members-${todayISO()}.pdf`,
-                    shareTitle: 'Debt Tracker Member Balances',
-                    members: filtered,
-                    expenses: ledger.expenses,
-                  })
-                }
-              />
-            )}
-            <HeaderPlusButton onPress={() => openMemberForm(null)} />
-          </>
+          filtered.length > 0 ? (
+            <ExportPillButton
+              label="Export"
+              onPress={() =>
+                exportLedgerSummaryPdf({
+                  filename: `debt-tracker-members-${todayISO()}.pdf`,
+                  shareTitle: 'Debt Tracker Member Balances',
+                  members: filtered,
+                  expenses: ledger.expenses,
+                })
+              }
+            />
+          ) : undefined
         }
       />
 
@@ -164,15 +160,18 @@ export default function MembersScreen() {
                         <Amount
                           value={formatPHP(Math.max(m.balanceCents, 0))}
                           caption={
-                            m.balanceCents > 0 ? 'owes' : m.expenseCount > 0 ? 'settled' : 'no bills'
+                            m.balanceCents > 0 ? 'remaining' : m.expenseCount > 0 ? 'settled' : 'no bills'
                           }
-                          tone={m.balanceCents > 0 ? 'owed' : 'muted'}
+                          tone={
+                            m.balanceCents > 0 ? 'owed' : m.expenseCount > 0 ? 'paid' : 'muted'
+                          }
                         />
-                        <IconChevronRight size={13} color={C.faint} />
+                        <IconChevronRight size={14} color={C.faint} />
                       </Pressable>
 
                       <Pressable
                         accessibilityLabel={`Actions for ${m.name}`}
+                        hitSlop={4}
                         onPress={() => {
                           hapticLight();
                           setMenuMember(m);
@@ -246,9 +245,10 @@ const styles = StyleSheet.create({
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 14,
+    minHeight: 62,
+    paddingLeft: 16,
     paddingRight: 6,
-    paddingVertical: 12,
+    paddingVertical: 14,
     gap: 6,
   },
   memberLink: {
@@ -258,13 +258,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   memberSub: {
-    fontSize: 12.5,
+    fontSize: 13,
     marginTop: 2,
   },
   moreBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },

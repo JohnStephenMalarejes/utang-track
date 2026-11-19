@@ -69,7 +69,7 @@ export default function SettingsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.themeTitle, { color: C.ink }]}>Theme</Text>
                   <Text style={[styles.themeSub, { color: C.muted }]}>
-                    {isDark ? 'Night Ledger active' : 'Warm Paper Ledger active'}
+                    {isDark ? 'Obsidian Monochrome active' : 'Crisp Monochrome Light active'}
                   </Text>
                 </View>
               </View>
@@ -255,18 +255,18 @@ const styles = StyleSheet.create({
   },
   segmentBtn: {
     flex: 1,
-    height: 34,
+    height: 38,
     borderRadius: R.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '600',
   },
   adminSquare: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: R.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -276,8 +276,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   signOutBtn: {
-    height: 34,
-    paddingHorizontal: 13,
+    height: 38,
+    paddingHorizontal: 14,
     borderRadius: R.sm,
     borderWidth: 1,
     alignItems: 'center',

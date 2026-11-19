@@ -1,29 +1,72 @@
 import { Platform, TextStyle } from 'react-native';
 
 /**
- * Design tokens — "Ledger" direction (Light & Night Ledger).
- * Warm paper, near-black ink, hairline rules and tabular figures.
- * Colour is reserved for meaning: brick = owed, green = paid, ochre = partial.
+ * Fintech Design Token System — Strict 90 / 10 Monochrome & Emerald
+ * (with WCAG AA verified contrast and reserved semantic danger token for irreversible/error states).
+ *
+ * Benchmarks: Wise, Cash App, Mercury, Ramp, Copilot Money, Linear.
  */
+
+export const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+} as const;
+
+export const R = {
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 20,
+  sheet: 20,
+  pill: 9999,
+} as const;
+
+export const METRICS = {
+  screenPad: 20,
+  touchMin: 44,
+  rowMinHeight: 60,
+  buttonHeight: 48,
+} as const;
+
 export interface LedgerColors {
+  // Core canvas & surface layering
   paper: string;
   surface: string;
   sunken: string;
+
+  // Monochrome ink hierarchy (WCAG AA compliant)
   ink: string;
   ink2: string;
   muted: string;
   faint: string;
+
+  // 1px hairline borders
   line: string;
   lineStrong: string;
 
+  // Semantic states
   owed: string;
   owedSoft: string;
   paid: string;
+  paidFill: string;
+  paidStrong: string;
   paidSoft: string;
+  paidBorder: string;
   partial: string;
   partialSoft: string;
   partialBorder: string;
 
+  // Reserved strictly for irreversible destructive confirmations, validation errors & error toasts
+  danger: string;
+  dangerSoft: string;
+  dangerBorder: string;
+
+  // Contrast on primary ink CTAs & badges
   onInk: string;
   onInkMuted: string;
   onInkFaint: string;
@@ -31,7 +74,7 @@ export interface LedgerColors {
   inkBorder: string;
   scrim: string;
 
-  // Elevated dark focal statement cards (stay deep obsidian in both themes)
+  // Elevated summary surface tokens
   cardBg: string;
   cardBorder: string;
   cardText: string;
@@ -39,6 +82,22 @@ export interface LedgerColors {
   cardTrack: string;
   cardPillBg: string;
   cardBarFill: string;
+
+  // Chime-inspired deep forest hero & soft mint highlight tokens
+  heroBg: string;
+  heroGlow: string;
+  heroGlowSoft: string;
+  heroText: string;
+  heroMuted: string;
+  heroAccent: string;
+  heroPillBg: string;
+  heroPillBorder: string;
+  forestInk: string;
+  mintCardBg: string;
+  mintCardBorder: string;
+  mintCardInk: string;
+  mintBadgeBg: string;
+  mintBadgeIcon: string;
 }
 
 export interface AvatarTint {
@@ -48,113 +107,135 @@ export interface AvatarTint {
 }
 
 export const LIGHT_COLORS: LedgerColors = {
-  paper: '#F6F4EF',
+  paper: '#FAFAFA',
   surface: '#FFFFFF',
-  sunken: '#EDEAE2',
-  ink: '#141310',
-  ink2: '#3A3830',
-  muted: '#747067',
-  faint: '#A6A196',
-  line: '#E5E1D8',
-  lineStrong: '#D0CBBF',
+  sunken: '#F4F4F5',
+  ink: '#09090B',
+  ink2: '#52525B',
+  muted: '#52525B',
+  faint: '#71717A', // 4.6:1 on #FFFFFF (WCAG AA)
+  line: '#E4E4E7',
+  lineStrong: '#D4D4D8',
 
-  owed: '#B83B1D',
-  owedSoft: '#F7E4DF',
-  paid: '#1E6B4B',
-  paidSoft: '#DFEFE7',
-  partial: '#9E630B',
-  partialSoft: '#F5E9D3',
-  partialBorder: '#E5CE9E',
+  owed: '#09090B',
+  owedSoft: '#F4F4F5',
+  paid: '#059669', // Emerald text on light/soft surfaces
+  paidFill: '#10B981', // Non-text progress bars & status dots
+  paidStrong: '#047857', // 5.48:1 with #FFFFFF text/icons (WCAG AA)
+  paidSoft: '#ECFDF5',
+  paidBorder: '#A7F3D0',
+  partial: '#52525B',
+  partialSoft: '#F4F4F5',
+  partialBorder: '#E4E4E7',
 
-  onInk: '#F6F4EF',
-  onInkMuted: 'rgba(246, 244, 239, 0.62)',
-  onInkFaint: 'rgba(246, 244, 239, 0.35)',
-  inkTrack: '#2D2B24',
-  inkBorder: '#27251F',
-  scrim: 'rgba(20, 19, 16, 0.46)',
+  danger: '#DC2626', // 4.83:1 on #FFFFFF / with #FFFFFF (WCAG AA)
+  dangerSoft: '#FEF2F2',
+  dangerBorder: '#FECACA',
 
-  cardBg: '#141310',
-  cardBorder: '#27251F',
-  cardText: '#F6F4EF',
-  cardMuted: 'rgba(246, 244, 239, 0.64)',
-  cardTrack: '#2D2B24',
-  cardPillBg: '#26241E',
-  cardBarFill: '#4EB384',
+  onInk: '#FFFFFF',
+  onInkMuted: 'rgba(255, 255, 255, 0.76)',
+  onInkFaint: 'rgba(255, 255, 255, 0.48)',
+  inkTrack: '#27272A',
+  inkBorder: '#27272A',
+  scrim: 'rgba(9, 9, 11, 0.44)',
+
+  cardBg: '#FFFFFF',
+  cardBorder: '#E4E4E7',
+  cardText: '#09090B',
+  cardMuted: '#52525B',
+  cardTrack: '#F4F4F5',
+  cardPillBg: '#F4F4F5',
+  cardBarFill: '#10B981',
+
+  heroBg: '#0B3522',
+  heroGlow: '#145C3A',
+  heroGlowSoft: '#19754A',
+  heroText: '#FFFFFF',
+  heroMuted: 'rgba(255, 255, 255, 0.78)',
+  heroAccent: '#34D399',
+  heroPillBg: 'rgba(16, 185, 129, 0.14)',
+  heroPillBorder: '#34D399',
+  forestInk: '#0B3522',
+  mintCardBg: '#C8F1E3',
+  mintCardBorder: '#A7E6D0',
+  mintCardInk: '#092B1B',
+  mintBadgeBg: '#0B3522',
+  mintBadgeIcon: '#34D399',
 };
 
 export const DARK_COLORS: LedgerColors = {
-  paper: '#12110F',
-  surface: '#1B1A17',
-  sunken: '#26241F',
-  ink: '#F2EFE8',
-  ink2: '#CCC7BC',
-  muted: '#969084',
-  faint: '#6B665D',
-  line: '#2D2B26',
-  lineStrong: '#403D36',
+  paper: '#09090B',
+  surface: '#111113',
+  sunken: '#18181B',
+  ink: '#FAFAFA',
+  ink2: '#D4D4D8',
+  muted: '#A1A1AA', // 7.5:1 on #111113 (WCAG AA/AAA)
+  faint: '#71717A', // 4.1:1 on #111113 (UI icon AA)
+  line: '#27272A',
+  lineStrong: '#3F3F46',
 
-  owed: '#E56A4C',
-  owedSoft: '#351F1A',
-  paid: '#4EB384',
-  paidSoft: '#162C22',
-  partial: '#E5A23C',
-  partialSoft: '#312615',
-  partialBorder: '#574323',
+  owed: '#FAFAFA',
+  owedSoft: '#18181B',
+  paid: '#34D399', // High-contrast emerald text on obsidian
+  paidFill: '#10B981',
+  paidStrong: '#047857',
+  paidSoft: '#052E1F',
+  paidBorder: '#065F46',
+  partial: '#A1A1AA',
+  partialSoft: '#18181B',
+  partialBorder: '#27272A',
 
-  onInk: '#141310',
-  onInkMuted: 'rgba(20, 19, 16, 0.66)',
-  onInkFaint: 'rgba(20, 19, 16, 0.38)',
-  inkTrack: '#34312A',
-  inkBorder: '#3B3830',
-  scrim: 'rgba(0, 0, 0, 0.68)',
+  danger: '#F87171',
+  dangerSoft: '#2A1215',
+  dangerBorder: '#5C1F26',
 
-  cardBg: '#23211C',
-  cardBorder: '#3A372F',
-  cardText: '#F4F1EA',
-  cardMuted: 'rgba(244, 241, 234, 0.64)',
-  cardTrack: '#36332C',
-  cardPillBg: '#312E28',
-  cardBarFill: '#4EB384',
+  onInk: '#09090B',
+  onInkMuted: 'rgba(9, 9, 11, 0.72)',
+  onInkFaint: 'rgba(9, 9, 11, 0.44)',
+  inkTrack: '#27272A',
+  inkBorder: '#3F3F46',
+  scrim: 'rgba(0, 0, 0, 0.72)',
+
+  cardBg: '#111113',
+  cardBorder: '#27272A',
+  cardText: '#FAFAFA',
+  cardMuted: '#A1A1AA',
+  cardTrack: '#27272A',
+  cardPillBg: '#18181B',
+  cardBarFill: '#10B981',
+
+  heroBg: '#072417',
+  heroGlow: '#0F452B',
+  heroGlowSoft: '#145C3A',
+  heroText: '#FFFFFF',
+  heroMuted: 'rgba(255, 255, 255, 0.76)',
+  heroAccent: '#34D399',
+  heroPillBg: 'rgba(52, 211, 153, 0.14)',
+  heroPillBorder: '#34D399',
+  forestInk: '#FAFAFA',
+  mintCardBg: '#0C2B1E',
+  mintCardBorder: '#164E37',
+  mintCardInk: '#ECFDF5',
+  mintBadgeBg: '#061A11',
+  mintBadgeIcon: '#34D399',
 };
 
 /**
- * Muted, earthy editorial avatar tints derived deterministically per member.
+ * Monochrome neutral monogram surfaces — zero pastel circles.
  */
 export const AVATAR_TINTS_LIGHT: AvatarTint[] = [
-  { bg: '#F4E6DF', border: '#E4CDC2', text: '#8C4328' }, // terracotta
-  { bg: '#E3EFE8', border: '#CBE0D3', text: '#245B43' }, // sage
-  { bg: '#E5EAF0', border: '#CED7E2', text: '#354E6B' }, // slate
-  { bg: '#F3ECD8', border: '#E2D6B6', text: '#7D5817' }, // ochre
-  { bg: '#EDE6F0', border: '#DBD0E0', text: '#5B3F6B' }, // plum
-  { bg: '#EAE7E0', border: '#D7D2C6', text: '#4B473D' }, // stone
+  { bg: '#F4F4F5', border: '#E4E4E7', text: '#09090B' },
 ];
 
 export const AVATAR_TINTS_DARK: AvatarTint[] = [
-  { bg: '#31221C', border: '#4A342B', text: '#E59B7E' }, // terracotta
-  { bg: '#1B2C24', border: '#2B4438', text: '#7BC9A4' }, // sage
-  { bg: '#1E2732', border: '#303F50', text: '#8FB2D9' }, // slate
-  { bg: '#302819', border: '#4A3E26', text: '#E2BC72' }, // ochre
-  { bg: '#2A2230', border: '#42354C', text: '#C5A2D8' }, // plum
-  { bg: '#282621', border: '#3E3B33', text: '#C9C4B8' }, // stone
+  { bg: '#18181B', border: '#27272A', text: '#FAFAFA' },
 ];
 
-export function pickAvatarTint(seed: string, tints: AvatarTint[]): AvatarTint {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  }
-  const idx = Math.abs(hash) % tints.length;
-  return tints[idx];
+export function pickAvatarTint(_seed: string, tints: AvatarTint[]): AvatarTint {
+  return tints[0];
 }
 
 export const C = LIGHT_COLORS;
-
-export const R = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 18,
-};
 
 export const MonoFont = Platform.select({
   ios: 'ui-monospace',
@@ -167,22 +248,22 @@ export const tabular: TextStyle = { fontVariant: ['tabular-nums'] };
 export function makeTypography(colors: LedgerColors) {
   return {
     display: {
-      fontSize: 40,
+      fontSize: 44,
       fontWeight: '700',
-      letterSpacing: -1.4,
+      letterSpacing: -1.32,
       color: colors.ink,
       ...tabular,
     } as TextStyle,
     title: {
-      fontSize: 26,
+      fontSize: 28,
       fontWeight: '700',
-      letterSpacing: -0.7,
+      letterSpacing: -0.84,
       color: colors.ink,
     } as TextStyle,
     heading: {
       fontSize: 17,
       fontWeight: '600',
-      letterSpacing: -0.2,
+      letterSpacing: -0.4,
       color: colors.ink,
     } as TextStyle,
     body: {
@@ -191,28 +272,28 @@ export function makeTypography(colors: LedgerColors) {
       color: colors.ink,
     } as TextStyle,
     bodyStrong: {
-      fontSize: 14.5,
+      fontSize: 15,
       fontWeight: '600',
       color: colors.ink,
-      letterSpacing: -0.1,
+      letterSpacing: -0.2,
     } as TextStyle,
     small: {
-      fontSize: 12.5,
+      fontSize: 13,
       fontWeight: '400',
       color: colors.muted,
     } as TextStyle,
     micro: {
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 1.0,
+      fontSize: 11.5,
+      fontWeight: '600',
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
       color: colors.muted,
     } as TextStyle,
     amount: {
-      fontSize: 14.5,
+      fontSize: 15,
       fontWeight: '600',
       color: colors.ink,
-      letterSpacing: -0.2,
+      letterSpacing: -0.3,
       ...tabular,
     } as TextStyle,
   };
@@ -222,4 +303,4 @@ export type LedgerTypography = ReturnType<typeof makeTypography>;
 
 export const T = makeTypography(LIGHT_COLORS);
 
-export const bottomSafePad = Platform.OS === 'ios' ? 28 : 18;
+export const bottomSafePad = Platform.OS === 'ios' ? 28 : 20;

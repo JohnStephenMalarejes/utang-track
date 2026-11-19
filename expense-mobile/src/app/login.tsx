@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ErrorBanner } from '@/components/mobile-ui';
 import { useLedger } from '@/context/ledger-context';
 import { useAppTheme } from '@/context/theme-context';
 import { R } from '@/design/tokens';
@@ -93,7 +94,7 @@ export default function LoginScreen() {
                   style={[
                     styles.input,
                     {
-                      borderColor: error ? C.owed : C.lineStrong,
+                      borderColor: error ? C.danger : C.lineStrong,
                       color: C.ink,
                       backgroundColor: C.surface,
                     },
@@ -121,13 +122,13 @@ export default function LoginScreen() {
                   style={[
                     styles.input,
                     {
-                      borderColor: error ? C.owed : C.lineStrong,
+                      borderColor: error ? C.danger : C.lineStrong,
                       color: C.ink,
                       backgroundColor: C.surface,
                     },
                   ]}
                 />
-                {error ? <Text style={[styles.errorText, { color: C.owed }]}>{error}</Text> : null}
+                <ErrorBanner message={error} />
               </View>
 
               <Pressable

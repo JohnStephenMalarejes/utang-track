@@ -7,7 +7,6 @@ import {
   Avatar,
   ChipRow,
   ConfirmModal,
-  HeaderPlusButton,
   ListGroup,
   ListRow,
   MobileEmpty,
@@ -114,7 +113,6 @@ export default function PaymentsScreen() {
               } · ${formatPHP(outstandingTotal)}`
             : 'All shares settled'
         }
-        right={<HeaderPlusButton onPress={() => openPaymentForm(null)} />}
       />
 
       <View style={styles.stack}>
@@ -142,7 +140,7 @@ export default function PaymentsScreen() {
         {tab === 'unpaid' && (
           <View style={{ gap: 8 }}>
             {outstanding.length > 0 && (
-              <Text style={[styles.swipeHint, { color: C.faint }]}>
+              <Text style={[styles.swipeHint, { color: C.muted }]}>
                 Tip: swipe left on any row to settle quickly
               </Text>
             )}
@@ -188,6 +186,7 @@ export default function PaymentsScreen() {
                       </Pressable>
 
                       <Pressable
+                        hitSlop={4}
                         onPress={() => {
                           hapticLight();
                           setToSettle(s);
@@ -372,14 +371,15 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   swipeHint: {
-    fontSize: 11.5,
+    fontSize: 12,
     paddingHorizontal: 2,
   },
   unpaidRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    minHeight: 62,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 12,
   },
   unpaidLeft: {
@@ -389,21 +389,23 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowSubtitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     marginTop: 2,
   },
   rowMeta: {
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 11.5,
+    marginTop: 2,
     ...tabular,
   },
   settleBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    height: 40,
+    paddingHorizontal: 14,
     borderRadius: R.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settleBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   dayTotalText: {

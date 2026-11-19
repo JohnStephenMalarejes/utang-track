@@ -81,7 +81,7 @@ export function SplashOverlay({ ready }: { ready: boolean }) {
         </View>
 
         <Text style={[styles.wordmark, { color: C.ink }]}>
-          debt<Text style={[styles.wordmarkLight, { color: C.muted }]}> tracker</Text>
+          Debt<Text style={[styles.wordmarkLight, { color: C.muted }]}> Tracker</Text>
         </Text>
         <Text style={[T.micro, { marginTop: 6 }]}>Shared Expense Ledger</Text>
       </Animated.View>

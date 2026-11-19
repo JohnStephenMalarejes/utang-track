@@ -36,13 +36,15 @@ function AppContent() {
     }
   }, [authLoading, user, pathname, router]);
 
+  const isHome = pathname === '/' || pathname === '/index';
+
   return (
     <View style={{ flex: 1, backgroundColor: C.paper }}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style={isDark || isHome ? 'light' : 'dark'} />
       {error && !user ? (
         <View style={[styles.errorWrap, { backgroundColor: C.paper }]}>
           <Text style={[styles.errorTitle, { color: C.ink }]}>Database Error</Text>
-          <Text style={[styles.errorBody, { color: C.owed }]}>{error}</Text>
+          <Text style={[styles.errorBody, { color: C.danger }]}>{error}</Text>
         </View>
       ) : (
         <MobileShell>
