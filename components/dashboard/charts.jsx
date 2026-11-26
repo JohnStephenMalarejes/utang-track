@@ -6,24 +6,25 @@ import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
+import { maskMoney, useUI } from "@/components/layout/ui-provider";
 import { formatPHP } from "@/lib/utils";
 
 // Teal leads; the rest step through ink and cool grays so categories stay distinct without a rainbow.
 export const CHART_COLORS = ["#00ADB5", "#222831", "#5FC4C9", "#6B7380", "#A9B0BA", "#CDEFF0"];
-const AXIS = { fontSize: 11, fill: "#7A828E", fontFamily: "var(--font-geist-mono)" };
-const GRID = "#EDF0F3";
+const DARK_CHART_COLORS = ["#5CD3A3", "#38BDF8", "#818CF8", "#F59E0B", "#94A3B8", "#2DD4BF"];
 
 const pesos = (cents) => Math.round(cents) / 100;
 const compact = (v) => (v >= 1000 ? `₱${+(v / 1000).toFixed(1)}k` : `₱${v}`);
 
-function ChartTooltip({ active, payload, label, valueLabel }) {
+function ChartTooltip({ active, payload, label, valueLabel, privacyMode }) {
   if (!active || !payload?.length) return null;
   const item = payload[0];
+  const formatted = maskMoney(formatPHP(Math.round(Number(item.value) * 100)), privacyMode);
   return (
-    <div className="rounded-md border bg-card px-3 py-2 text-[12px] shadow-pop">
+    <div className="rounded-md border bg-card px-3 py-2 text-[12px] text-card-foreground shadow-pop">
       <p className="mb-1 text-muted-foreground">{label ?? item.name}</p>
       <p className="tabular font-medium">
-        {formatPHP(Math.round(Number(item.value) * 100))}
+        {formatted}
         {valueLabel && <span className="ml-1.5 font-sans font-normal text-muted-foreground">{valueLabel}</span>}
       </p>
     </div>
@@ -62,6 +63,13 @@ export function ChartCard({ title, description, empty, emptyText = "No data yet"
 
 /** Bar chart of { label, totalCents } rows (daily, weekly or monthly spending). */
 export const SpendingBarChart = memo(function SpendingBarChart({ title, description, data, emptyText, tickInterval = "preserveStartEnd" }) {
+  const { resolvedTheme, privacyMode } = useUI();
+  const dark = resolvedTheme === "dark";
+  const axis = useMemo(() => ({ fontSize: 11, fill: dark ? "#94A3B8" : "#7A828E", fontFamily: "var(--font-geist-mono)" }), [dark]);
+  const grid = dark ? "#1E293B" : "#EDF0F3";
+  const cursorFill = dark ? "rgba(148, 163, 184, 0.08)" : "#F3F5F7";
+  const barFill = dark ? "#5CD3A3" : "#00ADB5";
+
   const rows = useMemo(() => data.map((d) => ({ label: d.label, amount: pesos(d.totalCents) })), [data]);
   const total = useMemo(() => data.reduce((s, d) => s + d.totalCents, 0), [data]);
   const empty = total === 0;
@@ -71,14 +79,14 @@ export const SpendingBarChart = memo(function SpendingBarChart({ title, descript
       description={description}
       empty={empty}
       emptyText={emptyText}
-      aside={<span className="tabular text-[13px] font-medium">{formatPHP(total)}</span>}
+      aside={<span className="tabular text-[13px] font-medium">{maskMoney(formatPHP(total), privacyMode)}</span>}
     >
       <BarChart data={rows} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke={GRID} />
-        <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval={tickInterval} minTickGap={16} dy={6} />
-        <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={compact} width={52} />
-        <Tooltip content={<ChartTooltip valueLabel="spent" />} cursor={{ fill: "#F3F5F7" }} />
-        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+        <CartesianGrid vertical={false} stroke={grid} />
+        <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={tickInterval} minTickGap={16} dy={6} />
+        <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={privacyMode ? () => "₱••" : compact} width={52} />
+        <Tooltip content={<ChartTooltip valueLabel="spent" privacyMode={privacyMode} />} cursor={{ fill: cursorFill }} />
+        <Bar dataKey="amount" fill={barFill} radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
       </BarChart>
     </ChartCard>
   );
@@ -86,6 +94,13 @@ export const SpendingBarChart = memo(function SpendingBarChart({ title, descript
 
 /** Bare bar chart (used inside the Reports period summary card without a second card frame). */
 export const SpendingBarChartInline = memo(function SpendingBarChartInline({ data }) {
+  const { resolvedTheme, privacyMode } = useUI();
+  const dark = resolvedTheme === "dark";
+  const axis = useMemo(() => ({ fontSize: 11, fill: dark ? "#94A3B8" : "#7A828E", fontFamily: "var(--font-geist-mono)" }), [dark]);
+  const grid = dark ? "#1E293B" : "#EDF0F3";
+  const cursorFill = dark ? "rgba(148, 163, 184, 0.08)" : "#F3F5F7";
+  const barFill = dark ? "#5CD3A3" : "#00ADB5";
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const rows = useMemo(() => data.map((d) => ({ label: d.label, amount: d.totalCents / 100 })), [data]);
@@ -95,11 +110,11 @@ export const SpendingBarChartInline = memo(function SpendingBarChartInline({ dat
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke={GRID} />
-        <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} dy={6} />
-        <YAxis tick={AXIS} tickLine={false} axisLine={false} width={52} tickFormatter={compact} />
-        <Tooltip content={<ChartTooltip valueLabel="spent" />} cursor={{ fill: "#F3F5F7" }} />
-        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+        <CartesianGrid vertical={false} stroke={grid} />
+        <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} dy={6} />
+        <YAxis tick={axis} tickLine={false} axisLine={false} width={52} tickFormatter={privacyMode ? () => "₱••" : compact} />
+        <Tooltip content={<ChartTooltip valueLabel="spent" privacyMode={privacyMode} />} cursor={{ fill: cursorFill }} />
+        <Bar dataKey="amount" fill={barFill} radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -107,6 +122,9 @@ export const SpendingBarChartInline = memo(function SpendingBarChartInline({ dat
 
 /** Donut chart of categories [{ category, totalCents }] with a ranked legend beside it. */
 export const CategoryChart = memo(function CategoryChart({ title = "Spending by category", description, data }) {
+  const { resolvedTheme, privacyMode } = useUI();
+  const dark = resolvedTheme === "dark";
+  const palette = dark ? DARK_CHART_COLORS : CHART_COLORS;
   const rows = useMemo(() => data.map((d) => ({ name: d.category, value: pesos(d.totalCents) })), [data]);
   const total = useMemo(() => data.reduce((s, d) => s + d.totalCents, 0), [data]);
   const [mounted, setMounted] = useState(false);
@@ -135,26 +153,26 @@ export const CategoryChart = memo(function CategoryChart({ title = "Spending by 
                     innerRadius="62%"
                     outerRadius="88%"
                     paddingAngle={1.5}
-                    stroke="#fff"
+                    stroke={dark ? "#0F172A" : "#fff"}
                     strokeWidth={2}
                     isAnimationActive={false}
                   >
                     {rows.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      <Cell key={i} fill={palette[i % palette.length]} />
                     ))}
                   </Pie>
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip privacyMode={privacyMode} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="eyebrow">Total</span>
-                <span className="tabular mt-0.5 text-[13px] font-medium">{formatPHP(total)}</span>
+                <span className="tabular mt-0.5 text-[13px] font-medium">{maskMoney(formatPHP(total), privacyMode)}</span>
               </div>
             </div>
             <ul className="flex-1 space-y-2.5 text-[12.5px]">
               {data.map((d, i) => (
                 <li key={d.category} className="flex items-center gap-2">
-                  <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} aria-hidden="true" />
+                  <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: palette[i % palette.length] }} aria-hidden="true" />
                   <span className="flex-1 truncate">{d.category}</span>
                   <span className="tabular text-muted-foreground">{total ? Math.round((d.totalCents / total) * 100) : 0}%</span>
                 </li>
@@ -169,20 +187,26 @@ export const CategoryChart = memo(function CategoryChart({ title = "Spending by 
 
 /** Settled vs outstanding comparison. */
 export const SettlementChart = memo(function SettlementChart({ title = "Settled vs unsettled", description, settledCents, outstandingCents }) {
+  const { resolvedTheme, privacyMode } = useUI();
+  const dark = resolvedTheme === "dark";
+  const axis = useMemo(() => ({ fontSize: 11, fill: dark ? "#94A3B8" : "#7A828E", fontFamily: "var(--font-geist-mono)" }), [dark]);
+  const grid = dark ? "#1E293B" : "#EDF0F3";
+  const cursorFill = dark ? "rgba(148, 163, 184, 0.08)" : "#F3F5F7";
+
   const rows = useMemo(
     () => [
-      { name: "Received", value: pesos(settledCents), fill: "#00ADB5" },
-      { name: "Outstanding", value: pesos(outstandingCents), fill: "#222831" },
+      { name: "Received", value: pesos(settledCents), fill: dark ? "#5CD3A3" : "#00ADB5" },
+      { name: "Outstanding", value: pesos(outstandingCents), fill: dark ? "#475569" : "#222831" },
     ],
-    [settledCents, outstandingCents]
+    [settledCents, outstandingCents, dark]
   );
   return (
     <ChartCard title={title} description={description} empty={settledCents === 0 && outstandingCents === 0} emptyText="Nothing to compare yet">
       <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barCategoryGap="28%">
-        <CartesianGrid horizontal={false} stroke={GRID} />
-        <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={compact} />
-        <YAxis type="category" dataKey="name" tick={{ ...AXIS, fontFamily: "var(--font-geist-sans)", fontSize: 12 }} tickLine={false} axisLine={false} width={84} />
-        <Tooltip content={<ChartTooltip />} cursor={{ fill: "#F3F5F7" }} />
+        <CartesianGrid horizontal={false} stroke={grid} />
+        <XAxis type="number" tick={axis} tickLine={false} axisLine={false} tickFormatter={privacyMode ? () => "₱••" : compact} />
+        <YAxis type="category" dataKey="name" tick={{ ...axis, fontFamily: "var(--font-geist-sans)", fontSize: 12 }} tickLine={false} axisLine={false} width={84} />
+        <Tooltip content={<ChartTooltip privacyMode={privacyMode} />} cursor={{ fill: cursorFill }} />
         <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={32} isAnimationActive={false}>
           {rows.map((r) => (
             <Cell key={r.name} fill={r.fill} />

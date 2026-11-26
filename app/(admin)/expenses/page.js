@@ -5,5 +5,5 @@ export const metadata = { title: "Expenses" };
 
 export default async function ExpensesPage({ searchParams }) {
   const [ledger, params] = await Promise.all([getLedger(), searchParams]);
-  return <ExpensesView ledger={ledger} initialOpen={params?.new === "1"} />;
+  return <ExpensesView ledger={ledger} initialOpen={params?.new === "1"} initialQuery={params?.q || ""} />;
 }

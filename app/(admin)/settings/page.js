@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/layout/export-button";
 import { PaymentDetailsForm } from "@/components/settings/payment-details-form";
+import { AppearanceControls } from "@/components/settings/appearance-card";
 import { ListGroup, ListRow, SectionLabel } from "@/components/layout/mobile";
 
 export const metadata = { title: "Settings" };
@@ -55,6 +56,13 @@ export default async function SettingsPage() {
           </ListGroup>
         </section>
 
+        <section aria-label="Appearance">
+          <SectionLabel>Appearance & privacy</SectionLabel>
+          <div className="rounded-2xl bg-white p-4 shadow-hairline dark:bg-slate-900">
+            <AppearanceControls compact />
+          </div>
+        </section>
+
         <section aria-label="Payment details">
           <SectionLabel>Payment details</SectionLabel>
           <div className="rounded-2xl bg-white p-4 shadow-hairline">
@@ -98,6 +106,16 @@ export default async function SettingsPage() {
                 <LogOut /> Sign out
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance & preferences</CardTitle>
+            <CardDescription>Theme, privacy masking, sidebar layout and keyboard shortcuts.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AppearanceControls />
           </CardContent>
         </Card>
 

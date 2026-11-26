@@ -23,11 +23,13 @@ import {
   ListGroup,
   ListRow,
   MobileEmpty,
+  PrivateMoney,
   SplitBar,
   StatusText,
   UnderlineTabs,
   shortDate,
 } from "@/components/layout/mobile";
+import { maskMoney, useUI } from "@/components/layout/ui-provider";
 import { MemberFormDialog } from "./member-form-dialog";
 import { ShareLinkDialog } from "./share-link-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
@@ -42,6 +44,7 @@ function Stat({ label, value, children }) {
 }
 
 export function MemberDetail({ ledger, memberId }) {
+  const { privacyMode } = useUI();
   const viewport = useViewport(768);
   const showMobile = viewport !== "desktop";
   const showDesktop = viewport !== "mobile";
@@ -124,11 +127,11 @@ export function MemberDetail({ ledger, memberId }) {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
                 <span className="text-slate-500">Paid back</span>
-                <span className="tabular font-semibold text-ink">{formatPHP(member.paidCents)}</span>
+                <PrivateMoney cents={member.paidCents} className="font-semibold text-ink" />
               </div>
               <div>
                 <span className="text-slate-500">Assigned </span>
-                <span className="tabular font-semibold text-ink">{formatPHP(member.assignedCents)}</span>
+                <PrivateMoney cents={member.assignedCents} className="font-semibold text-ink" />
               </div>
             </div>
           </div>
@@ -189,12 +192,12 @@ export function MemberDetail({ ledger, memberId }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14.5px] font-medium text-ink">{s.expenseDescription}</p>
                     <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
-                      {shortDate(s.expenseDate)} · share {formatPHP(s.amountCents)}
+                      {shortDate(s.expenseDate)} · share {maskMoney(formatPHP(s.amountCents), privacyMode)}
                       {s.isPayer ? " · paid the bill" : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(Math.max(s.remainingCents, 0))}</p>
+                    <PrivateMoney cents={Math.max(s.remainingCents, 0)} className="block text-[14.5px] font-semibold text-ink" />
                     <StatusText status={s.status} className="mt-0.5 justify-end" />
                   </div>
                   {s.remainingCents > 0 && !s.isPayer && (
@@ -225,7 +228,7 @@ export function MemberDetail({ ledger, memberId }) {
                   key={p.id}
                   title={p.expenseDescription}
                   subtitle={`${shortDate(p.date)} · ${p.paymentMethod}${p.notes ? ` · “${p.notes}”` : ""}`}
-                  trailing={<span className="tabular shrink-0 text-[14.5px] font-semibold text-mint-deep">+{formatPHP(p.amountCents)}</span>}
+                  trailing={<PrivateMoney cents={p.amountCents} prefix="+" className="shrink-0 text-[14.5px] font-semibold text-mint-deep" />}
                 />
               ))
             )}

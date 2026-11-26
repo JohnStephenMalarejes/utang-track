@@ -29,6 +29,14 @@
     --warning: 28 90% 32%;
     --warning-soft: 42 95% 91%;
 
+    /* Brand tokens */
+    --canvas: 220 14% 95%;
+    --ink: 227 49% 15%;
+    --ink-soft: 227 33% 25%;
+    --ink-muted: 227 17% 43%;
+    --mint-deep: 160 74% 27%;
+    --mint-soft: 153 50% 93%;
+
     /* App shell */
     --sidebar: 222 47% 11%;
     --sidebar-foreground: 214 20% 82%;
@@ -36,6 +44,47 @@
     --sidebar-border: 217 33% 20%;
 
     --radius: 0.625rem;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 11%;
+    --card-foreground: 210 40% 96%;
+    --primary: 156 62% 60%;
+    --primary-foreground: 222 47% 9%;
+    --secondary: 217 33% 20%;
+    --secondary-foreground: 210 40% 96%;
+    --accent: 183 80% 44%;
+    --accent-foreground: 222 47% 9%;
+    --accent-strong: 180 72% 52%;
+    --accent-soft: 185 45% 16%;
+    --muted: 222 33% 15%;
+    --muted-foreground: 215 20% 66%;
+    --subtle: 215 18% 55%;
+    --border: 217 28% 20%;
+    --input: 217 28% 24%;
+    --ring: 183 80% 44%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 156 62% 58%;
+    --success-soft: 158 45% 15%;
+    --warning: 38 92% 62%;
+    --warning-soft: 36 60% 16%;
+
+    /* Brand tokens in dark mode */
+    --canvas: 222 47% 7%;
+    --ink: 210 40% 96%;
+    --ink-soft: 214 28% 82%;
+    --ink-muted: 215 18% 64%;
+    --mint-deep: 156 62% 60%;
+    --mint-soft: 160 40% 16%;
+
+    --sidebar: 222 50% 6%;
+    --sidebar-foreground: 214 20% 82%;
+    --sidebar-muted: 220 38% 13%;
+    --sidebar-border: 217 30% 16%;
   }
 
   * {
@@ -48,7 +97,7 @@
     overscroll-behavior-y: none;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
     font-feature-settings: "cv11", "ss01";
     touch-action: pan-x pan-y;
     overscroll-behavior-y: none;
@@ -74,7 +123,7 @@
   }
   ::selection {
     background: hsl(var(--accent) / 0.22);
-    color: #0f172a;
+    color: hsl(var(--foreground));
   }
 }
 
@@ -87,7 +136,17 @@
   }
   /* Small uppercase section label */
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500;
+    @apply text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500 dark:text-slate-400;
+  }
+
+  /* Privacy mode blur helper for inline money figures */
+  .money-mask {
+    transition: filter 160ms ease;
+  }
+  [data-privacy="true"] .money-mask {
+    filter: blur(6px);
+    user-select: none;
+    pointer-events: none;
   }
 
   /* ---------- Mobile app primitives ---------- */
@@ -115,11 +174,95 @@
   .tap:active {
     background-color: rgb(20 28 58 / 0.04);
   }
+  .dark .tap:active {
+    background-color: rgb(241 245 249 / 0.06);
+  }
   /* Skip layout & paint for off-screen list sections on long feeds */
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: auto 72px;
   }
+}
+
+/* Harmonize shadows and legacy light surface classes across all views in dark mode */
+.dark .shadow-hairline {
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.14), 0 1px 2px 0 rgb(0 0 0 / 0.35);
+}
+.dark .shadow-card {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.35), 0 1px 3px 0 rgb(0 0 0 / 0.25);
+}
+.dark .shadow-sheet {
+  box-shadow: 0 -12px 40px -12px rgb(0 0 0 / 0.7);
+}
+.dark .shadow-pop {
+  box-shadow: 0 14px 36px -8px rgb(0 0 0 / 0.65), 0 2px 8px -2px rgb(0 0 0 / 0.45);
+}
+
+/* Graceful dark mode adaptation for existing surfaces & text inside main content and dialogs */
+.dark main .bg-white:not([data-keep-light]),
+.dark [role="dialog"] .bg-white:not([data-keep-light]),
+.dark [role="alertdialog"] .bg-white:not([data-keep-light]) {
+  background-color: hsl(var(--card));
+}
+.dark main .bg-slate-50,
+.dark [role="dialog"] .bg-slate-50,
+.dark [role="alertdialog"] .bg-slate-50 {
+  background-color: rgb(15 23 42 / 0.65);
+}
+.dark main .bg-slate-100,
+.dark [role="dialog"] .bg-slate-100,
+.dark [role="alertdialog"] .bg-slate-100 {
+  background-color: rgb(30 41 59 / 0.8);
+}
+.dark main .border-slate-200,
+.dark [role="dialog"] .border-slate-200,
+.dark [role="alertdialog"] .border-slate-200 {
+  border-color: hsl(var(--border));
+}
+.dark main .border-slate-100,
+.dark [role="dialog"] .border-slate-100,
+.dark [role="alertdialog"] .border-slate-100 {
+  border-color: rgb(30 41 59 / 0.85);
+}
+.dark main .text-slate-900,
+.dark [role="dialog"] .text-slate-900,
+.dark [role="alertdialog"] .text-slate-900 {
+  color: rgb(241 245 249);
+}
+.dark main .text-slate-800,
+.dark [role="dialog"] .text-slate-800,
+.dark [role="alertdialog"] .text-slate-800 {
+  color: rgb(226 232 240);
+}
+.dark main .text-slate-700,
+.dark [role="dialog"] .text-slate-700,
+.dark [role="alertdialog"] .text-slate-700 {
+  color: rgb(203 213 225);
+}
+.dark main .text-slate-600,
+.dark [role="dialog"] .text-slate-600,
+.dark [role="alertdialog"] .text-slate-600 {
+  color: rgb(148 163 184);
+}
+.dark main .text-slate-500,
+.dark [role="dialog"] .text-slate-500,
+.dark [role="alertdialog"] .text-slate-500 {
+  color: rgb(148 163 184);
+}
+.dark main .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.dark [role="dialog"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: hsl(var(--border));
+}
+/* Ensure primary bg-ink buttons stay high-contrast in dark mode */
+.dark .bg-ink {
+  background-color: #5CD3A3;
+  color: #0b1120;
+}
+.dark .bg-ink .text-mint {
+  color: #0b1120;
+}
+.dark .bg-ink.text-mint {
+  color: #0b1120;
 }
 
 @media (prefers-reduced-motion: reduce) {

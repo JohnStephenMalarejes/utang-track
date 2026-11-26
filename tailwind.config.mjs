@@ -2,15 +2,24 @@ import animate from "tailwindcss-animate";
 
 /** @type {import('tailwindcss').Config} */
 const config = {
+  darkMode: "class",
   content: ["./app/**/*.{js,jsx}", "./components/**/*.{js,jsx}", "./hooks/**/*.{js,jsx}"],
   theme: {
     container: { center: true, padding: "1rem", screens: { "2xl": "1400px" } },
     extend: {
       colors: {
         // Brand tokens lifted from the logo: navy ink + mint arrow.
-        ink: { DEFAULT: "#141C3A", soft: "#2B3456", muted: "#5B6380" },
-        mint: { DEFAULT: "#5CD3A3", deep: "#127A57", soft: "#E4F6EE" },
-        canvas: "#F2F3F5",
+        ink: {
+          DEFAULT: "hsl(var(--ink) / <alpha-value>)",
+          soft: "hsl(var(--ink-soft) / <alpha-value>)",
+          muted: "hsl(var(--ink-muted) / <alpha-value>)",
+        },
+        mint: {
+          DEFAULT: "#5CD3A3",
+          deep: "hsl(var(--mint-deep) / <alpha-value>)",
+          soft: "hsl(var(--mint-soft) / <alpha-value>)",
+        },
+        canvas: "hsl(var(--canvas) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",

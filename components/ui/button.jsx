@@ -4,17 +4,19 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-slate-900 text-white shadow-sm hover:bg-slate-800 active:bg-slate-950",
+        default:
+          "bg-slate-900 text-white shadow-sm hover:bg-slate-800 active:bg-slate-950 dark:bg-mint dark:text-slate-950 dark:hover:bg-mint/90",
         accent: "bg-teal-600 text-white shadow-sm hover:bg-teal-700 active:bg-teal-800",
-        outline: "border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 hover:text-slate-950",
-        secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
-        ghost: "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+        outline:
+          "border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white",
+        secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700",
+        ghost: "text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
         destructive: "bg-red-600 text-white shadow-sm hover:bg-red-700",
-        link: "h-auto px-0 text-teal-700 underline-offset-4 hover:underline",
+        link: "h-auto px-0 text-teal-700 underline-offset-4 hover:underline dark:text-teal-400",
       },
       size: {
         default: "h-9 px-3.5",

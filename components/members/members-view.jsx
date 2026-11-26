@@ -2,11 +2,13 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Copy, HandCoins, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { deleteMember } from "@/app/actions/members";
 import { useServerAction } from "@/hooks/use-server-action";
 import { useViewport } from "@/hooks/use-viewport";
+import { maskMoney, useUI } from "@/components/layout/ui-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,14 +28,18 @@ import {
   MiniMeter,
   MobileEmpty,
   MoreButton,
+  PrivateMoney,
   SearchField,
+  SwipeableRow,
 } from "@/components/layout/mobile";
 import { MemberFormDialog } from "./member-form-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
-import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
+import { buildLedgerPdf, buildSingilMessage, formatDate, formatPHP, todayISO } from "@/lib/utils";
 
 export function MembersView({ ledger, initialOpen = false }) {
   const { members } = ledger;
+  const router = useRouter();
+  const { privacyMode } = useUI();
   const viewport = useViewport(768);
   const showMobile = viewport !== "desktop";
   const showDesktop = viewport !== "mobile";
@@ -72,6 +78,23 @@ export function MembersView({ ledger, initialOpen = false }) {
     setToDelete(member);
   }
 
+  async function copySingil(member) {
+    const openShares = ledger.shares.filter((s) => s.memberId === member.id && !s.isPayer && s.remainingCents > 0);
+    const shareUrl = member.shareToken && typeof window !== "undefined" ? `${window.location.origin}/s/${member.shareToken}` : "";
+    const text = buildSingilMessage({
+      memberName: member.name,
+      unpaidShares: openShares,
+      paymentDetails: ledger.paymentDetails,
+      shareUrl,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Singil copied for ${member.name}`);
+    } catch {
+      toast.error("Could not copy reminder message");
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -80,7 +103,7 @@ export function MembersView({ ledger, initialOpen = false }) {
         description="The people you share expenses with."
         mobileSubtitle={
           members.length > 0
-            ? `${members.length} ${members.length === 1 ? "person" : "people"} · ${formatPHP(ledger.totals.outstandingCents)} owed`
+            ? `${members.length} ${members.length === 1 ? "person" : "people"} · ${maskMoney(formatPHP(ledger.totals.outstandingCents), privacyMode)} owed`
             : "People you split bills with"
         }
         mobileActions={
@@ -161,26 +184,49 @@ export function MembersView({ ledger, initialOpen = false }) {
                   {rows.map((m) => {
                     const pct = m.assignedCents > 0 ? (m.paidCents / m.assignedCents) * 100 : 100;
                     return (
-                      <div key={m.id} className="flex items-center gap-2 px-4 py-3">
-                        <Link href={`/members/${m.id}`} className="tap -my-3 -ml-4 flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
-                          <Avatar name={m.name} id={m.id} />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[14.5px] font-medium text-ink">{m.name}</p>
-                            <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
-                              {m.contact || `${m.expenseCount} ${m.expenseCount === 1 ? "bill" : "bills"}`}
-                              {m.assignedCents > 0 ? ` · ${formatPHP(m.paidCents)} paid` : ""}
-                            </p>
-                            {m.assignedCents > 0 && <MiniMeter value={pct} className="mt-2" />}
-                          </div>
-                          <Amount
-                            value={formatPHP(Math.max(m.balanceCents, 0))}
-                            caption={m.balanceCents > 0 ? "owes" : m.expenseCount > 0 ? "settled" : "no bills"}
-                            tone={m.balanceCents > 0 ? "text-ink" : "text-slate-400"}
-                          />
-                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
-                        </Link>
-                        <MoreButton label={`Actions for ${m.name}`} onClick={() => setMenuMember(m)} />
-                      </div>
+                      <SwipeableRow
+                        key={m.id}
+                        id={`mem-${m.id}`}
+                        leftAction={
+                          m.balanceCents > 0
+                            ? {
+                                label: "Pay",
+                                icon: HandCoins,
+                                toneClass: "bg-emerald-600",
+                                onSelect: () => router.push(`/payments?new=1&member=${m.id}`),
+                              }
+                            : null
+                        }
+                        rightActions={[
+                          {
+                            label: "Singil",
+                            icon: Copy,
+                            toneClass: "bg-teal-600",
+                            onSelect: () => copySingil(m),
+                          },
+                        ]}
+                      >
+                        <div className="flex items-center gap-2 px-4 py-3">
+                          <Link href={`/members/${m.id}`} className="tap -my-3 -ml-4 flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
+                            <Avatar name={m.name} id={m.id} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[14.5px] font-medium text-ink">{m.name}</p>
+                              <p className="mt-0.5 truncate text-[12.5px] text-slate-500">
+                                {m.contact || `${m.expenseCount} ${m.expenseCount === 1 ? "bill" : "bills"}`}
+                                {m.assignedCents > 0 ? ` · ${maskMoney(formatPHP(m.paidCents), privacyMode)} paid` : ""}
+                              </p>
+                              {m.assignedCents > 0 && <MiniMeter value={pct} className="mt-2" />}
+                            </div>
+                            <Amount
+                              value={formatPHP(Math.max(m.balanceCents, 0))}
+                              caption={m.balanceCents > 0 ? "owes" : m.expenseCount > 0 ? "settled" : "no bills"}
+                              tone={m.balanceCents > 0 ? "text-ink" : "text-slate-400"}
+                            />
+                            <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
+                          </Link>
+                          <MoreButton label={`Actions for ${m.name}`} onClick={() => setMenuMember(m)} />
+                        </div>
+                      </SwipeableRow>
                     );
                   })}
                 </ListGroup>
@@ -240,9 +286,15 @@ export function MembersView({ ledger, initialOpen = false }) {
                         </Link>
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground lg:table-cell">{formatDate(m.createdAt?.slice(0, 10))}</TableCell>
-                      <TableCell className="hidden text-right tabular sm:table-cell">{formatPHP(m.assignedCents)}</TableCell>
-                      <TableCell className="hidden text-right tabular sm:table-cell">{formatPHP(m.paidCents)}</TableCell>
-                      <TableCell className="text-right font-semibold tabular">{formatPHP(m.balanceCents)}</TableCell>
+                      <TableCell className="hidden text-right tabular sm:table-cell">
+                        <PrivateMoney cents={m.assignedCents} />
+                      </TableCell>
+                      <TableCell className="hidden text-right tabular sm:table-cell">
+                        <PrivateMoney cents={m.paidCents} />
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular">
+                        <PrivateMoney cents={m.balanceCents} />
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <StatusBadge status={m.status} />
                       </TableCell>
@@ -273,8 +325,23 @@ export function MembersView({ ledger, initialOpen = false }) {
         open={Boolean(menuMember)}
         onOpenChange={(o) => !o && setMenuMember(null)}
         title={menuMember?.name}
-        description={menuMember?.contact || `${menuMember?.expenseCount ?? 0} bills · ${formatPHP(menuMember?.balanceCents ?? 0)} outstanding`}
+        description={
+          menuMember?.contact ||
+          `${menuMember?.expenseCount ?? 0} bills · ${maskMoney(formatPHP(menuMember?.balanceCents ?? 0), privacyMode)} outstanding`
+        }
         actions={[
+          menuMember &&
+            menuMember.balanceCents > 0 && {
+              label: "Record payment",
+              icon: HandCoins,
+              primary: true,
+              onSelect: () => router.push(`/payments?new=1&member=${menuMember.id}`),
+            },
+          menuMember && {
+            label: "Copy singil message",
+            icon: Copy,
+            onSelect: () => copySingil(menuMember),
+          },
           menuMember && {
             label: "Edit member",
             icon: Pencil,

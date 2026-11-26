@@ -6,10 +6,10 @@ import { fieldBase } from "./input";
 /** Native <select> styled like shadcn's Select: accessible by default and ideal on mobile. */
 const Select = React.forwardRef(({ className, children, ...props }, ref) => (
   <div className="relative">
-    <select ref={ref} className={cn(fieldBase, "h-11 appearance-none pl-3 pr-8 text-slate-900 md:h-9", className)} {...props}>
+    <select ref={ref} className={cn(fieldBase, "h-11 appearance-none pl-3 pr-8 text-slate-900 dark:text-slate-100 md:h-9", className)} {...props}>
       {children}
     </select>
-    <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+    <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 dark:text-slate-400" aria-hidden="true" />
   </div>
 ));
 Select.displayName = "Select";

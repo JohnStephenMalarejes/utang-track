@@ -38,7 +38,7 @@ import { PaymentFormDialog } from "./payment-form-dialog";
 import { PAGE_SIZE, PAYMENT_METHODS } from "@/lib/constants";
 import { buildSingilMessage, formatDate, formatPHP, sumCents, todayISO } from "@/lib/utils";
 
-export function PaymentsView({ ledger, initialOpen = false }) {
+export function PaymentsView({ ledger, initialOpen = false, initialMemberId = "" }) {
   const viewport = useViewport(768);
   const showMobile = viewport !== "desktop";
   const showDesktop = viewport !== "mobile";
@@ -50,7 +50,7 @@ export function PaymentsView({ ledger, initialOpen = false }) {
   const [mobileTab, setMobileTab] = useState("unpaid");
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
-  const [preset, setPreset] = useState(null);
+  const [preset, setPreset] = useState(() => (initialOpen && initialMemberId ? { memberId: initialMemberId, payAll: true } : null));
   const [toDelete, setToDelete] = useState(null);
   const [toDeleteBatch, setToDeleteBatch] = useState(null);
   const [toSettle, setToSettle] = useState(null);

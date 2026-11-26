@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, HandCoins, Plus, Receipt, Users } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Eye, EyeOff, HandCoins, Plus, Receipt, Users } from "lucide-react";
 import { useViewport } from "@/hooks/use-viewport";
+import { useUI } from "@/components/layout/ui-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ import {
   ListRow,
   MiniMeter,
   MobileEmpty,
+  PrivateMoney,
   SectionLabel,
   SplitBar,
   StatusText,
@@ -94,14 +96,15 @@ function Receivables({ members }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-[13.5px] font-medium text-slate-900">{m.name}</p>
-                        <p className={`tabular shrink-0 text-[13.5px] font-semibold ${m.balanceCents > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                          {formatPHP(Math.max(m.balanceCents, 0))}
-                        </p>
+                        <PrivateMoney
+                          cents={Math.max(m.balanceCents, 0)}
+                          className={`shrink-0 text-[13.5px] font-semibold ${m.balanceCents > 0 ? "text-slate-900" : "text-slate-500"}`}
+                        />
                       </div>
                       <div className="mt-1.5 flex items-center gap-3">
                         <Meter value={pct} tone={pct >= 100 ? "bg-emerald-600" : "bg-teal-600"} className="h-1.5" />
                         <span className="tabular w-24 shrink-0 text-right text-[11.5px] text-slate-500">
-                          {formatPHP(m.paidCents)} paid
+                          <PrivateMoney cents={m.paidCents} /> paid
                         </span>
                       </div>
                     </div>
@@ -171,7 +174,7 @@ function RecentActivity({ expenses }) {
                         <span className="hidden sm:inline-flex">
                           <StatusBadge status={e.status} />
                         </span>
-                        <span className="tabular text-right text-[13.5px] font-semibold text-slate-900 sm:w-24">{formatPHP(e.totalCents)}</span>
+                        <PrivateMoney cents={e.totalCents} className="text-right text-[13.5px] font-semibold text-slate-900 sm:w-24" />
                       </div>
                     </li>
                   );
@@ -187,6 +190,7 @@ function RecentActivity({ expenses }) {
 
 function MobileOverview({ ledger, daily, collectedPct, debtors }) {
   const { totals, members, expenses } = ledger;
+  const { privacyMode, togglePrivacy } = useUI();
   const [viewing, setViewing] = useState(null);
 
   const ranked = useMemo(
@@ -203,7 +207,18 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
       <section aria-label="Balance summary">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500">To collect</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500">To collect</p>
+              <button
+                type="button"
+                onClick={togglePrivacy}
+                aria-pressed={privacyMode}
+                aria-label={privacyMode ? "Show amounts" : "Hide amounts"}
+                className="press inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/70 hover:text-ink dark:hover:bg-slate-800"
+              >
+                {privacyMode ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
             <BigMoney cents={totals.outstandingCents} size="text-[42px]" className="mt-1.5" />
           </div>
           {(expenses.length > 0 || members.length > 0) && (
@@ -239,12 +254,12 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
               <span className="text-slate-500">Collected</span>
-              <span className="tabular font-semibold text-ink">{formatPHP(totals.settledCents)}</span>
+              <PrivateMoney cents={totals.settledCents} className="font-semibold text-ink" />
               <span className="tabular text-slate-400">({Math.round(collectedPct)}%)</span>
             </div>
             <div className="text-right">
               <span className="text-slate-500">Spent </span>
-              <span className="tabular font-semibold text-ink">{formatPHP(totals.expensesCents)}</span>
+              <PrivateMoney cents={totals.expensesCents} className="font-semibold text-ink" />
             </div>
           </div>
         </div>
@@ -303,7 +318,13 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
                   className="tap"
                   leading={<Avatar name={m.name} id={m.id} />}
                   title={m.name}
-                  subtitle={`${formatPHP(m.paidCents)} of ${formatPHP(m.assignedCents)} paid`}
+                  subtitle={
+                    privacyMode ? (
+                      "₱•••• of ₱•••• paid"
+                    ) : (
+                      `${formatPHP(m.paidCents)} of ${formatPHP(m.assignedCents)} paid`
+                    )
+                  }
                   trailing={
                     <div className="flex items-center gap-2">
                       <Amount
@@ -360,7 +381,7 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
                   subtitle={`${shortDate(e.date)} · ${e.category} · ${count} ${count === 1 ? "person" : "people"}`}
                   trailing={
                     <div className="shrink-0 text-right">
-                      <div className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(e.totalCents)}</div>
+                      <PrivateMoney cents={e.totalCents} className="block text-[14.5px] font-semibold text-ink" />
                       <StatusText status={e.status} className="mt-0.5 justify-end" />
                     </div>
                   }
@@ -386,7 +407,7 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
           <Link href="/reports" className="tap block rounded-2xl bg-white p-4 shadow-hairline">
             <div className="flex items-baseline justify-between">
               <span className="text-[12.5px] text-slate-500">14-day spend</span>
-              <span className="tabular text-[16px] font-semibold text-ink">{formatPHP(fourteenDayTotal)}</span>
+              <PrivateMoney cents={fourteenDayTotal} className="text-[16px] font-semibold text-ink" />
             </div>
             <div className="mt-3 flex h-14 items-end gap-1.5" aria-hidden="true">
               {daily.map((d) => {

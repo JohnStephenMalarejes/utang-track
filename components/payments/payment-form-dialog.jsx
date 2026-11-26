@@ -14,7 +14,7 @@ import { Field, Label } from "@/components/ui/label";
 import { ReceiptUpload } from "@/components/ui/receipt-upload";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PAYMENT_METHODS } from "@/lib/constants";
-import { centsToDecimal, cn, formatDate, formatPHP, parseAmount, sumCents, todayISO } from "@/lib/utils";
+import { centsToDecimal, cn, evaluateMoneyExpression, formatDate, formatPHP, parseAmount, sumCents, todayISO } from "@/lib/utils";
 
 /**
  * Record or edit a payment.
@@ -76,7 +76,7 @@ export function PaymentFormDialog({ open, onOpenChange, ledger, payment, preset 
   const share = shareOptions.find((s) => s.id === shareId);
   const available = share ? availableFor(share) : 0;
   const totalMemberRemaining = useMemo(() => sumCents(shareOptions.map((s) => Math.max(s.remainingCents, 0))), [shareOptions]);
-  const amountCents = parseAmount(amount);
+  const amountCents = parseAmount(amount) ?? evaluateMoneyExpression(amount);
   const overpaysSingle = !isPayAll && share && amountCents !== null && amountCents > available;
   const exceedsAllTotal = isPayAll && memberId && totalMemberRemaining > 0 && amountCents !== null && amountCents > totalMemberRemaining;
 

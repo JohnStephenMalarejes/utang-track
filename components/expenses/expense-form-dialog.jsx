@@ -13,8 +13,11 @@ import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/label";
 import { ReceiptUpload } from "@/components/ui/receipt-upload";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { avatarColor } from "@/components/layout/avatar";
 import { CATEGORIES } from "@/lib/constants";
-import { centsToDecimal, cn, formatPHP, parseAmount, splitEqual, sumCents, todayISO } from "@/lib/utils";
+import { centsToDecimal, cn, evaluateMoneyExpression, formatPHP, parseAmount, splitEqual, sumCents, todayISO } from "@/lib/utils";
+
+const parseMoneyField = (raw) => parseAmount(raw) ?? evaluateMoneyExpression(raw);
 
 const blank = () => ({
   description: "",
@@ -107,7 +110,7 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense, duplica
 
   const participants = useMemo(() => members.filter((m) => form.selected[m.id]), [members, form.selected]);
   const splitCount = participants.length + (form.includeUser ? 1 : 0);
-  const totalCents = parseAmount(form.total);
+  const totalCents = parseMoneyField(form.total);
 
   // Per-person amounts in cents (null = not a valid amount yet)
   const { shareCents, userShareCents } = useMemo(() => {
@@ -118,11 +121,27 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense, duplica
       userCents = form.includeUser ? (parts[0] ?? null) : 0;
       participants.forEach((m, i) => (out[m.id] = parts[i + (form.includeUser ? 1 : 0)] ?? null));
     } else {
-      userCents = form.includeUser ? parseAmount(form.userCustom) : 0;
-      participants.forEach((m) => (out[m.id] = parseAmount(form.custom[m.id])));
+      userCents = form.includeUser ? parseMoneyField(form.userCustom) : 0;
+      participants.forEach((m) => (out[m.id] = parseMoneyField(form.custom[m.id])));
     }
     return { shareCents: out, userShareCents: userCents };
   }, [form.mode, form.custom, form.includeUser, form.userCustom, participants, splitCount, totalCents]);
+
+  // Segments for the live visual split bar
+  const splitSegments = useMemo(() => {
+    if (!totalCents || totalCents <= 0) return [];
+    const segs = [];
+    if (form.includeUser && userShareCents > 0) {
+      segs.push({ id: "__you__", label: "You", cents: userShareCents, color: "#334155" });
+    }
+    for (const m of participants) {
+      const c = shareCents[m.id];
+      if (c && c > 0) {
+        segs.push({ id: m.id, label: m.name, cents: c, color: avatarColor(m.id || m.name) });
+      }
+    }
+    return segs;
+  }, [totalCents, form.includeUser, userShareCents, participants, shareCents]);
 
   const allMembersValid = participants.length > 0 && participants.every((m) => shareCents[m.id] !== null && shareCents[m.id] > 0);
   const userValid = !form.includeUser || (userShareCents !== null && userShareCents > 0);
@@ -335,6 +354,58 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense, duplica
                     Clear
                   </Button>
                 </div>
+
+                {/* Live visual split preview bar */}
+                {totalCents > 0 && splitSegments.length > 0 && (
+                  <div className="space-y-2 rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div className="flex items-center justify-between text-[11.5px]">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Split preview</span>
+                      <span className="tabular font-medium text-slate-500 dark:text-slate-400">
+                        {formatPHP(sharesTotal)} / {formatPHP(totalCents)}
+                      </span>
+                    </div>
+                    <div
+                      className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800"
+                      role="img"
+                      aria-label="Visual split distribution"
+                    >
+                      {splitSegments.map((seg) => {
+                        const denom = Math.max(totalCents, sharesTotal, 1);
+                        const pct = (seg.cents / denom) * 100;
+                        return (
+                          <div
+                            key={seg.id}
+                            title={`${seg.label}: ${formatPHP(seg.cents)} (${Math.round((seg.cents / totalCents) * 100)}%)`}
+                            className="h-full first:rounded-l-full last:rounded-r-full transition-[width] duration-300"
+                            style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: seg.color }}
+                          />
+                        );
+                      })}
+                      {form.mode === "custom" && diff > 0 && (
+                        <div
+                          title={`Unassigned: ${formatPHP(diff)}`}
+                          className="h-full flex-1 rounded-r-full bg-amber-300/60 dark:bg-amber-500/35"
+                        />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      {splitSegments.map((seg) => (
+                        <span key={seg.id} className="inline-flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: seg.color }} aria-hidden="true" />
+                          <span className="max-w-[7rem] truncate font-medium">{seg.label}</span>
+                          <span className="tabular text-slate-400 dark:text-slate-400">{Math.round((seg.cents / totalCents) * 100)}%</span>
+                        </span>
+                      ))}
+                      {form.mode === "custom" && diff > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                          <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
+                          <span>Unassigned</span>
+                          <span className="tabular">{formatPHP(diff)}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <ul className="divide-y rounded-xl border border-slate-200 md:rounded-lg">
                   <li className="flex items-center justify-between gap-3 bg-muted/30 px-3.5 py-2.5">

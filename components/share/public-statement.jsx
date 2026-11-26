@@ -47,11 +47,11 @@ export function PublicStatement({ statement }) {
         </header>
 
         {/* Balance summary */}
-        <section className="rounded-2xl bg-white p-5 shadow-hairline">
-          <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500">
+        <section className="rounded-2xl bg-white p-5 shadow-hairline dark:bg-slate-900">
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate-500 dark:text-slate-400">
             {member.balanceCents < 0 ? "Credit (overpaid)" : "Outstanding balance"}
           </p>
-          <BigMoney cents={Math.abs(member.balanceCents)} size="text-[40px]" className="mt-1.5" />
+          <BigMoney cents={Math.abs(member.balanceCents)} size="text-[40px]" className="mt-1.5" forceVisible />
           <p className="mt-2 text-[13px] text-slate-500">
             {unpaidShares.length > 0
               ? `${unpaidShares.length} unpaid ${unpaidShares.length === 1 ? "expense" : "expenses"} remaining`
@@ -74,7 +74,7 @@ export function PublicStatement({ statement }) {
 
         {/* Saved payment instructions */}
         {paymentDetails && unpaidShares.length > 0 && (
-          <section className="rounded-2xl bg-white p-5 shadow-hairline">
+          <section className="rounded-2xl bg-white p-5 shadow-hairline dark:bg-slate-900">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">Where to pay</h2>

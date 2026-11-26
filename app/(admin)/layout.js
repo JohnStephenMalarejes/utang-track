@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AdminShell } from "@/components/layout/admin-shell";
 import { ConfigNotice } from "@/components/layout/config-notice";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getLedger } from "@/lib/data";
 import { signOut } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
@@ -37,10 +38,51 @@ export default async function AdminLayout({ children }) {
     );
   }
 
+  // Build compact search index for Command Palette (deduplicated per-request via React cache())
+  let commandIndex = { members: [], unpaidByMember: {}, recentExpenses: [], paymentDetails: "" };
+  try {
+    const ledger = await getLedger();
+    const unpaidByMember = {};
+    for (const s of ledger.shares) {
+      if (s.isPayer || s.remainingCents <= 0) continue;
+      if (!unpaidByMember[s.memberId]) unpaidByMember[s.memberId] = [];
+      unpaidByMember[s.memberId].push({
+        expenseDescription: s.expenseDescription,
+        expenseCategory: s.expenseCategory,
+        expenseDate: s.expenseDate,
+        remainingCents: s.remainingCents,
+        owedCents: s.owedCents,
+        paidCents: s.paidCents,
+        isPayer: false,
+      });
+    }
+    commandIndex = {
+      members: ledger.members.map((m) => ({
+        id: m.id,
+        name: m.name,
+        contact: m.contact,
+        balanceCents: m.balanceCents,
+        expenseCount: m.expenseCount,
+        shareToken: m.shareToken,
+      })),
+      unpaidByMember,
+      recentExpenses: ledger.expenses.slice(0, 50).map((e) => ({
+        id: e.id,
+        description: e.description,
+        category: e.category,
+        date: e.date,
+        totalCents: e.totalCents,
+        status: e.status,
+      })),
+      paymentDetails: ledger.paymentDetails || "",
+    };
+  } catch {
+    // Non-fatal: let the page's own error boundary handle DB errors if any
+  }
+
   return (
-    <div className="min-h-dvh bg-canvas lg:bg-slate-50 lg:pl-60">
-      <Sidebar email={user.email} />
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-5 sm:px-6 lg:px-8 lg:py-8">{children}</main>
-    </div>
+    <AdminShell email={user.email} commandIndex={commandIndex}>
+      {children}
+    </AdminShell>
   );
 }

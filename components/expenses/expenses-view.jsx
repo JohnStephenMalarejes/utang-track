@@ -22,13 +22,16 @@ import {
   ListGroup,
   ListRow,
   MobileEmpty,
+  PrivateMoney,
   SearchField,
   SectionLabel,
   StatusText,
+  SwipeableRow,
   UnderlineTabs,
   dayLabel,
   groupByDate,
 } from "@/components/layout/mobile";
+import { maskMoney, useUI } from "@/components/layout/ui-provider";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { ExpenseDetailDialog } from "./expense-detail-dialog";
 import { CATEGORIES, PAGE_SIZE, STATUS_LABELS } from "@/lib/constants";
@@ -36,12 +39,13 @@ import { buildLedgerPdf, formatDate, formatPHP, sumCents, todayISO } from "@/lib
 
 const NO_FILTERS = { query: "", from: "", to: "", category: "", member: "", status: "" };
 
-export function ExpensesView({ ledger, initialOpen = false }) {
+export function ExpensesView({ ledger, initialOpen = false, initialQuery = "" }) {
   const { expenses, members } = ledger;
+  const { privacyMode } = useUI();
   const viewport = useViewport(768);
   const showMobile = viewport !== "desktop";
   const showDesktop = viewport !== "mobile";
-  const [filters, setFilters] = useState(NO_FILTERS);
+  const [filters, setFilters] = useState(() => ({ ...NO_FILTERS, query: initialQuery }));
   const deferredQuery = useDeferredValue(filters.query);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [page, setPage] = useState(1);
@@ -114,7 +118,11 @@ export function ExpensesView({ ledger, initialOpen = false }) {
         eyebrow="Ledger"
         title="Expenses"
         description="Every shared bill and how it was split."
-        mobileSubtitle={expenses.length > 0 ? `${filtered.length} ${filtered.length === 1 ? "bill" : "bills"} · ${formatPHP(filteredTotal)}` : "Shared bills and splits"}
+        mobileSubtitle={
+          expenses.length > 0
+            ? `${filtered.length} ${filtered.length === 1 ? "bill" : "bills"} · ${maskMoney(formatPHP(filteredTotal), privacyMode)}`
+            : "Shared bills and splits"
+        }
         mobileActions={
           <>
             {filtered.length > 0 && (
@@ -260,7 +268,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                 {groupedRows.map(([date, items]) => (
                   <section key={date} aria-label={dayLabel(date)}>
                     <SectionLabel
-                      action={<span className="tabular text-[12px] font-medium text-slate-400">{formatPHP(sumCents(items.map((i) => i.totalCents)))}</span>}
+                      action={<PrivateMoney cents={sumCents(items.map((i) => i.totalCents))} className="text-[12px] font-medium text-slate-400" />}
                     >
                       {dayLabel(date)}
                     </SectionLabel>
@@ -268,22 +276,40 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                       {items.map((e) => {
                         const people = [...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)];
                         return (
-                          <ListRow
+                          <SwipeableRow
                             key={e.id}
-                            as="button"
-                            type="button"
-                            onClick={() => setViewing(e)}
-                            className="tap"
-                            leading={<CategoryGlyph category={e.category} />}
-                            title={e.description}
-                            subtitle={`Paid by ${e.paidByName ?? "You"} · ${people.join(", ")}`}
-                            trailing={
-                              <div className="shrink-0 text-right">
-                                <div className="tabular text-[14.5px] font-semibold text-ink">{formatPHP(e.totalCents)}</div>
-                                <StatusText status={e.status} className="mt-0.5 justify-end" />
-                              </div>
-                            }
-                          />
+                            id={`exp-${e.id}`}
+                            rightActions={[
+                              {
+                                label: "Duplicate",
+                                icon: Copy,
+                                toneClass: "bg-teal-600",
+                                onSelect: () => openDuplicate(e),
+                              },
+                              {
+                                label: "Edit",
+                                icon: Pencil,
+                                toneClass: "bg-slate-700",
+                                onSelect: () => openForm(e),
+                              },
+                            ]}
+                          >
+                            <ListRow
+                              as="button"
+                              type="button"
+                              onClick={() => setViewing(e)}
+                              className="tap"
+                              leading={<CategoryGlyph category={e.category} />}
+                              title={e.description}
+                              subtitle={`Paid by ${e.paidByName ?? "You"} · ${people.join(", ")}`}
+                              trailing={
+                                <div className="shrink-0 text-right">
+                                  <PrivateMoney cents={e.totalCents} className="block text-[14.5px] font-semibold text-ink" />
+                                  <StatusText status={e.status} className="mt-0.5 justify-end" />
+                                </div>
+                              }
+                            />
+                          </SwipeableRow>
                         );
                       })}
                     </ListGroup>
@@ -382,7 +408,9 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                           {[...(e.userShareCents > 0 ? ["You"] : []), ...e.shares.map((s) => s.memberName)].join(", ")}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-semibold tabular">{formatPHP(e.totalCents)}</TableCell>
+                      <TableCell className="text-right font-semibold tabular">
+                        <PrivateMoney cents={e.totalCents} />
+                      </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <StatusBadge status={e.status} />
                       </TableCell>

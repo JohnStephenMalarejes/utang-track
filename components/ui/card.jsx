@@ -4,7 +4,10 @@ import { cn } from "@/lib/utils";
 const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("rounded-2xl bg-white text-slate-900 shadow-hairline md:rounded-lg md:border md:border-slate-200 md:shadow-card", className)}
+    className={cn(
+      "rounded-2xl bg-white text-slate-900 shadow-hairline dark:bg-slate-900 dark:text-slate-100 md:rounded-lg md:border md:border-slate-200 md:shadow-card md:dark:border-slate-800",
+      className
+    )}
     {...props}
   />
 ));
@@ -16,12 +19,12 @@ const CardHeader = React.forwardRef(({ className, ...props }, ref) => (
 CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <h3 ref={ref} className={cn("text-[14px] font-semibold leading-tight tracking-[-0.005em] text-slate-900", className)} {...props} />
+  <h3 ref={ref} className={cn("text-[14px] font-semibold leading-tight tracking-[-0.005em] text-slate-900 dark:text-slate-100", className)} {...props} />
 ));
 CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-[12.5px] text-slate-600", className)} {...props} />
+  <p ref={ref} className={cn("text-[12.5px] text-slate-600 dark:text-slate-400", className)} {...props} />
 ));
 CardDescription.displayName = "CardDescription";
 
