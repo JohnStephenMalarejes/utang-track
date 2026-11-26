@@ -115,6 +115,11 @@
   .tap:active {
     background-color: rgb(20 28 58 / 0.04);
   }
+  /* Skip layout & paint for off-screen list sections on long feeds */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 72px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

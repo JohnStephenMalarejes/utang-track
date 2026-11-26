@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,14 +61,15 @@ export function ChartCard({ title, description, empty, emptyText = "No data yet"
 }
 
 /** Bar chart of { label, totalCents } rows (daily, weekly or monthly spending). */
-export function SpendingBarChart({ title, description, data, emptyText, tickInterval = "preserveStartEnd" }) {
-  const rows = data.map((d) => ({ label: d.label, amount: pesos(d.totalCents) }));
-  const total = data.reduce((s, d) => s + d.totalCents, 0);
+export const SpendingBarChart = memo(function SpendingBarChart({ title, description, data, emptyText, tickInterval = "preserveStartEnd" }) {
+  const rows = useMemo(() => data.map((d) => ({ label: d.label, amount: pesos(d.totalCents) })), [data]);
+  const total = useMemo(() => data.reduce((s, d) => s + d.totalCents, 0), [data]);
+  const empty = total === 0;
   return (
     <ChartCard
       title={title}
       description={description}
-      empty={data.every((d) => d.totalCents === 0)}
+      empty={empty}
       emptyText={emptyText}
       aside={<span className="tabular text-[13px] font-medium">{formatPHP(total)}</span>}
     >
@@ -77,16 +78,37 @@ export function SpendingBarChart({ title, description, data, emptyText, tickInte
         <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval={tickInterval} minTickGap={16} dy={6} />
         <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={compact} width={52} />
         <Tooltip content={<ChartTooltip valueLabel="spent" />} cursor={{ fill: "#F3F5F7" }} />
-        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} />
+        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
       </BarChart>
     </ChartCard>
   );
-}
+});
+
+/** Bare bar chart (used inside the Reports period summary card without a second card frame). */
+export const SpendingBarChartInline = memo(function SpendingBarChartInline({ data }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const rows = useMemo(() => data.map((d) => ({ label: d.label, amount: d.totalCents / 100 })), [data]);
+
+  if (!mounted) return <Skeleton className="h-full w-full" />;
+  if (data.length === 0) return <EmptyState icon={BarChart3} title="No expenses in this range" className="h-full py-4" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke={GRID} />
+        <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} dy={6} />
+        <YAxis tick={AXIS} tickLine={false} axisLine={false} width={52} tickFormatter={compact} />
+        <Tooltip content={<ChartTooltip valueLabel="spent" />} cursor={{ fill: "#F3F5F7" }} />
+        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+});
 
 /** Donut chart of categories [{ category, totalCents }] with a ranked legend beside it. */
-export function CategoryChart({ title = "Spending by category", description, data }) {
-  const rows = data.map((d) => ({ name: d.category, value: pesos(d.totalCents) }));
-  const total = data.reduce((s, d) => s + d.totalCents, 0);
+export const CategoryChart = memo(function CategoryChart({ title = "Spending by category", description, data }) {
+  const rows = useMemo(() => data.map((d) => ({ name: d.category, value: pesos(d.totalCents) })), [data]);
+  const total = useMemo(() => data.reduce((s, d) => s + d.totalCents, 0), [data]);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -106,7 +128,17 @@ export function CategoryChart({ title = "Spending by category", description, dat
             <div className="relative h-full w-1/2 min-w-[140px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={rows} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={1.5} stroke="#fff" strokeWidth={2}>
+                  <Pie
+                    data={rows}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="62%"
+                    outerRadius="88%"
+                    paddingAngle={1.5}
+                    stroke="#fff"
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                  >
                     {rows.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
@@ -133,14 +165,17 @@ export function CategoryChart({ title = "Spending by category", description, dat
       </CardContent>
     </Card>
   );
-}
+});
 
 /** Settled vs outstanding comparison. */
-export function SettlementChart({ title = "Settled vs unsettled", description, settledCents, outstandingCents }) {
-  const rows = [
-    { name: "Received", value: pesos(settledCents), fill: "#00ADB5" },
-    { name: "Outstanding", value: pesos(outstandingCents), fill: "#222831" },
-  ];
+export const SettlementChart = memo(function SettlementChart({ title = "Settled vs unsettled", description, settledCents, outstandingCents }) {
+  const rows = useMemo(
+    () => [
+      { name: "Received", value: pesos(settledCents), fill: "#00ADB5" },
+      { name: "Outstanding", value: pesos(outstandingCents), fill: "#222831" },
+    ],
+    [settledCents, outstandingCents]
+  );
   return (
     <ChartCard title={title} description={description} empty={settledCents === 0 && outstandingCents === 0} emptyText="Nothing to compare yet">
       <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barCategoryGap="28%">
@@ -148,7 +183,7 @@ export function SettlementChart({ title = "Settled vs unsettled", description, s
         <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={compact} />
         <YAxis type="category" dataKey="name" tick={{ ...AXIS, fontFamily: "var(--font-geist-sans)", fontSize: 12 }} tickLine={false} axisLine={false} width={84} />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: "#F3F5F7" }} />
-        <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={32}>
+        <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={32} isAnimationActive={false}>
           {rows.map((r) => (
             <Cell key={r.name} fill={r.fill} />
           ))}
@@ -156,4 +191,4 @@ export function SettlementChart({ title = "Settled vs unsettled", description, s
       </BarChart>
     </ChartCard>
   );
-}
+});

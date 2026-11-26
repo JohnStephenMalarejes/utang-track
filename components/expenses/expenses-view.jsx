@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Eye, Pencil, Plus, Receipt, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { useDeferredValue, useMemo, useState } from "react";
+import { Copy, Eye, Paperclip, Pencil, Plus, Receipt, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { deleteExpense } from "@/app/actions/expenses";
 import { useServerAction } from "@/hooks/use-server-action";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,11 +38,16 @@ const NO_FILTERS = { query: "", from: "", to: "", category: "", member: "", stat
 
 export function ExpensesView({ ledger, initialOpen = false }) {
   const { expenses, members } = ledger;
+  const viewport = useViewport(768);
+  const showMobile = viewport !== "desktop";
+  const showDesktop = viewport !== "mobile";
   const [filters, setFilters] = useState(NO_FILTERS);
+  const deferredQuery = useDeferredValue(filters.query);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
+  const [duplicating, setDuplicating] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const { pending, run } = useServerAction();
@@ -54,7 +60,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
   const extraFilterCount = [filters.category, filters.member, filters.from, filters.to].filter(Boolean).length;
 
   const filtered = useMemo(() => {
-    const q = filters.query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     return expenses.filter((e) => {
       if (filters.from && e.date < filters.from) return false;
       if (filters.to && e.date > filters.to) return false;
@@ -67,7 +73,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
       }
       return true;
     });
-  }, [expenses, filters]);
+  }, [expenses, deferredQuery, filters.from, filters.to, filters.category, filters.status, filters.member]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -90,6 +96,13 @@ export function ExpensesView({ ledger, initialOpen = false }) {
 
   function openForm(expense = null) {
     setEditing(expense);
+    setDuplicating(null);
+    setFormOpen(true);
+  }
+
+  function openDuplicate(expense) {
+    setEditing(null);
+    setDuplicating(expense);
     setFormOpen(true);
   }
 
@@ -115,6 +128,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                     members,
                     expenses: filtered,
                     allExpenses: expenses,
+                    paymentDetails: ledger.paymentDetails,
                   })
                 }
               />
@@ -134,6 +148,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                 members,
                 expenses: filtered,
                 allExpenses: expenses,
+                paymentDetails: ledger.paymentDetails,
               })
             }
           />
@@ -154,6 +169,7 @@ export function ExpensesView({ ledger, initialOpen = false }) {
       ) : (
         <>
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
+          {showMobile && (
           <div className="space-y-4 md:hidden">
             <UnderlineTabs
               label="Filter by status"
@@ -279,8 +295,10 @@ export function ExpensesView({ ledger, initialOpen = false }) {
               </div>
             )}
           </div>
+          )}
 
           {/* ==================== DESKTOP TABLE VIEW (md+) ==================== */}
+          {showDesktop && (
           <Card className="hidden md:block">
             <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-6">
               <div className="relative sm:col-span-2 lg:col-span-2">
@@ -352,8 +370,9 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                     <TableRow key={e.id}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(e.date)}</TableCell>
                       <TableCell>
-                        <button type="button" onClick={() => setViewing(e)} className="text-left font-medium hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          {e.description}
+                        <button type="button" onClick={() => setViewing(e)} className="inline-flex items-center gap-1.5 text-left font-medium hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <span>{e.description}</span>
+                          {e.receiptPath && <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-label="Has receipt photo" />}
                         </button>
                         <div className="mt-0.5 text-[12px] text-muted-foreground">{e.category}</div>
                       </TableCell>
@@ -372,6 +391,9 @@ export function ExpensesView({ ledger, initialOpen = false }) {
                           <Button variant="ghost" size="icon" aria-label={`View ${e.description}`} onClick={() => setViewing(e)}>
                             <Eye />
                           </Button>
+                          <Button variant="ghost" size="icon" aria-label={`Duplicate ${e.description}`} onClick={() => openDuplicate(e)}>
+                            <Copy />
+                          </Button>
                           <Button variant="ghost" size="icon" aria-label={`Edit ${e.description}`} onClick={() => openForm(e)}>
                             <Pencil />
                           </Button>
@@ -387,13 +409,18 @@ export function ExpensesView({ ledger, initialOpen = false }) {
             )}
             <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
           </Card>
+          )}
         </>
       )}
 
-      <ExpenseFormDialog open={formOpen} onOpenChange={setFormOpen} ledger={ledger} expense={editing} />
+      <ExpenseFormDialog open={formOpen} onOpenChange={setFormOpen} ledger={ledger} expense={editing} duplicateFrom={duplicating} />
       <ExpenseDetailDialog
         expense={viewingLive}
         onOpenChange={(o) => !o && setViewing(null)}
+        onDuplicate={(exp) => {
+          setViewing(null);
+          openDuplicate(exp);
+        }}
         onEdit={(exp) => {
           setViewing(null);
           openForm(exp);

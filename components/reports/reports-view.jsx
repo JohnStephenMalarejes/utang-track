@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { BarChart3, PieChart, Plus, Users, Wallet, X } from "lucide-react";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,10 +28,18 @@ import {
   UnderlineTabs,
   shortDate,
 } from "@/components/layout/mobile";
-import { CategoryChart, SettlementChart } from "@/components/dashboard/charts";
 import { categoryTotals, expenseEntries, summarize, total } from "@/lib/calculations/analytics";
 import { statusFor } from "@/lib/calculations/ledger";
 import { buildLedgerPdf, formatDate, formatPHP, sumCents, todayISO } from "@/lib/utils";
+
+const ChartFallback = () => <Skeleton className="h-[316px] w-full rounded-xl" />;
+const InlineChartFallback = () => <Skeleton className="h-full w-full" />;
+const CategoryChart = dynamic(() => import("@/components/dashboard/charts").then((m) => m.CategoryChart), { ssr: false, loading: ChartFallback });
+const SettlementChart = dynamic(() => import("@/components/dashboard/charts").then((m) => m.SettlementChart), { ssr: false, loading: ChartFallback });
+const SpendingBarChartInline = dynamic(() => import("@/components/dashboard/charts").then((m) => m.SpendingBarChartInline), {
+  ssr: false,
+  loading: InlineChartFallback,
+});
 
 const GRANULARITY = [
   ["daily", "Daily"],
@@ -50,6 +59,9 @@ function Stat({ label, value, hint }) {
 }
 
 export function ReportsView({ ledger }) {
+  const viewport = useViewport(768);
+  const showMobile = viewport !== "desktop";
+  const showDesktop = viewport !== "mobile";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -133,6 +145,7 @@ export function ReportsView({ ledger }) {
                 members: ledger.members.filter((m) => !memberId || m.id === memberId),
                 expenses: scoped,
                 allExpenses: ledger.expenses,
+                paymentDetails: ledger.paymentDetails,
               })
             }
           />
@@ -146,6 +159,7 @@ export function ReportsView({ ledger }) {
               members: ledger.members.filter((m) => !memberId || m.id === memberId),
               expenses: scoped,
               allExpenses: ledger.expenses,
+              paymentDetails: ledger.paymentDetails,
             })
           }
         />
@@ -201,6 +215,7 @@ export function ReportsView({ ledger }) {
           </KpiStrip>
 
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
+          {showMobile && (
           <div className="mt-5 space-y-4 md:hidden">
             <UnderlineTabs label="Report sections" tabs={MOBILE_REPORT_TABS} value={mobileTab} onChange={setMobileTab} />
 
@@ -321,8 +336,10 @@ export function ReportsView({ ledger }) {
               </ListGroup>
             )}
           </div>
+          )}
 
           {/* ==================== DESKTOP VIEW (md+) ==================== */}
+          {showDesktop && (
           <div className="mt-6 hidden space-y-6 md:block">
             <Card>
               <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -492,29 +509,9 @@ export function ReportsView({ ledger }) {
               </CardContent>
             </Card>
           </div>
+          )}
         </>
       )}
     </>
-  );
-}
-
-// The period chart sits inside the summary card, so it uses the bare chart without a second card frame.
-
-function SpendingBarChartInline({ data }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <Skeleton className="h-full w-full" />;
-  if (data.length === 0) return <EmptyState icon={BarChart3} title="No expenses in this range" className="h-full py-4" />;
-  const rows = data.map((d) => ({ label: d.label, amount: d.totalCents / 100 }));
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke="#EDF0F3" />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#7A828E", fontFamily: "var(--font-geist-mono)" }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} dy={6} />
-        <YAxis tick={{ fontSize: 11, fill: "#7A828E", fontFamily: "var(--font-geist-mono)" }} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => (v >= 1000 ? `₱${+(v / 1000).toFixed(1)}k` : `₱${v}`)} />
-        <Tooltip formatter={(v) => [formatPHP(Math.round(Number(v) * 100)), "Spent"]} contentStyle={{ borderRadius: 6, border: "1px solid #E3E7EB", fontSize: 12, boxShadow: "0 12px 32px -8px rgb(16 24 40 / 0.18)" }} cursor={{ fill: "#F3F5F7" }} />
-        <Bar dataKey="amount" fill="#00ADB5" radius={[3, 3, 0, 0]} maxBarSize={28} />
-      </BarChart>
-    </ResponsiveContainer>
   );
 }

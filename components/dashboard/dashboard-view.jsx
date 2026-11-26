@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowUpRight, ChevronRight, HandCoins, Plus, Receipt, Users } from "lucide-react";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/layout/status-badge";
@@ -25,9 +28,13 @@ import {
   shortDate,
 } from "@/components/layout/mobile";
 import { ExpenseDetailDialog } from "@/components/expenses/expense-detail-dialog";
-import { CategoryChart, SettlementChart, SpendingBarChart } from "./charts";
 import { categoryTotals, expenseEntries, lastDaysSeries, lastMonthsSeries } from "@/lib/calculations/analytics";
 import { buildLedgerPdf, formatDateLong, formatPHP, todayISO } from "@/lib/utils";
+
+const ChartFallback = () => <Skeleton className="h-[316px] w-full rounded-xl" />;
+const SpendingBarChart = dynamic(() => import("./charts").then((m) => m.SpendingBarChart), { ssr: false, loading: ChartFallback });
+const CategoryChart = dynamic(() => import("./charts").then((m) => m.CategoryChart), { ssr: false, loading: ChartFallback });
+const SettlementChart = dynamic(() => import("./charts").then((m) => m.SettlementChart), { ssr: false, loading: ChartFallback });
 
 function SectionTitle({ id, title, action }) {
   return (
@@ -210,6 +217,7 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
                   members,
                   expenses,
                   payments: ledger.payments,
+                  paymentDetails: ledger.paymentDetails,
                 })
               }
             />
@@ -408,25 +416,31 @@ function MobileOverview({ ledger, daily, collectedPct, debtors }) {
 
 export function DashboardView({ ledger }) {
   const { totals, members, expenses } = ledger;
+  const viewport = useViewport(1024);
+  const showMobile = viewport !== "desktop";
+  const showDesktop = viewport !== "mobile";
 
   const entries = useMemo(() => expenseEntries(expenses), [expenses]);
   const daily = useMemo(() => lastDaysSeries(entries, 14), [entries]);
-  const monthly = useMemo(() => lastMonthsSeries(entries, 6), [entries]);
-  const categories = useMemo(() => categoryTotals(entries), [entries]);
+  const monthly = useMemo(() => (viewport === "desktop" ? lastMonthsSeries(entries, 6) : []), [entries, viewport]);
+  const categories = useMemo(() => (viewport === "desktop" ? categoryTotals(entries) : []), [entries, viewport]);
 
   const owedTotal = totals.settledCents + totals.outstandingCents;
   const collectedPct = owedTotal > 0 ? (totals.settledCents / owedTotal) * 100 : 0;
-  const debtors = members.filter((m) => m.balanceCents > 0).length;
+  const debtors = useMemo(() => members.filter((m) => m.balanceCents > 0).length, [members]);
 
   return (
     <>
       {/* ==================== MOBILE APP SCREEN (< lg) ==================== */}
-      <div className="lg:hidden">
-        <MobileOverview ledger={ledger} daily={daily} collectedPct={collectedPct} debtors={debtors} />
-      </div>
+      {showMobile && (
+        <div className="lg:hidden">
+          <MobileOverview ledger={ledger} daily={daily} collectedPct={collectedPct} debtors={debtors} />
+        </div>
+      )}
 
       {/* ==================== DESKTOP VIEW (lg+) ==================== */}
-      <div className="hidden lg:block">
+      {showDesktop && (
+        <div className="hidden lg:block">
         <PageHeader eyebrow="Overview" title="Where everyone stands" description="Outstanding balances, recent bills and spending trends.">
           {(expenses.length > 0 || members.length > 0) && (
             <PdfExportButton
@@ -437,6 +451,7 @@ export function DashboardView({ ledger }) {
                   members,
                   expenses,
                   payments: ledger.payments,
+                  paymentDetails: ledger.paymentDetails,
                 })
               }
             />
@@ -467,13 +482,25 @@ export function DashboardView({ ledger }) {
         <section className="mt-8" aria-labelledby="analytics">
           <SectionTitle id="analytics" title="Spending" />
           <div className="grid gap-6 lg:grid-cols-2">
-            <SpendingBarChart title="Daily" description="Last 14 days" data={daily} emptyText="No expenses in the last 14 days" />
-            <SpendingBarChart title="Monthly" description="Last 6 months" data={monthly} emptyText="No expenses in the last 6 months" tickInterval={0} />
-            <CategoryChart title="By category" description="Share of total spending" data={categories} />
-            <SettlementChart title="Collection" description="Received vs still owed" settledCents={totals.settledCents} outstandingCents={totals.outstandingCents} />
+            {viewport === "desktop" ? (
+              <>
+                <SpendingBarChart title="Daily" description="Last 14 days" data={daily} emptyText="No expenses in the last 14 days" />
+                <SpendingBarChart title="Monthly" description="Last 6 months" data={monthly} emptyText="No expenses in the last 6 months" tickInterval={0} />
+                <CategoryChart title="By category" description="Share of total spending" data={categories} />
+                <SettlementChart title="Collection" description="Received vs still owed" settledCents={totals.settledCents} outstandingCents={totals.outstandingCents} />
+              </>
+            ) : (
+              <>
+                <ChartFallback />
+                <ChartFallback />
+                <ChartFallback />
+                <ChartFallback />
+              </>
+            )}
           </div>
         </section>
       </div>
+      )}
     </>
   );
 }

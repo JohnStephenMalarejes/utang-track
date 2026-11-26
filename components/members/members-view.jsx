@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { deleteMember } from "@/app/actions/members";
 import { useServerAction } from "@/hooks/use-server-action";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,11 @@ import { buildLedgerPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
 
 export function MembersView({ ledger, initialOpen = false }) {
   const { members } = ledger;
+  const viewport = useViewport(768);
+  const showMobile = viewport !== "desktop";
+  const showDesktop = viewport !== "mobile";
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [editing, setEditing] = useState(null);
@@ -42,9 +47,9 @@ export function MembersView({ ledger, initialOpen = false }) {
   const { pending, run } = useServerAction();
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     return q ? members.filter((m) => `${m.name} ${m.contact} ${m.notes}`.toLowerCase().includes(q)) : members;
-  }, [members, query]);
+  }, [members, deferredQuery]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -92,8 +97,7 @@ export function MembersView({ ledger, initialOpen = false }) {
                     members: filtered,
                     expenses: ledger.expenses,
                     payments: ledger.payments,
-                    includeExpenses: false,
-                    includePayments: false,
+                    paymentDetails: ledger.paymentDetails,
                   })
                 }
               />
@@ -114,8 +118,7 @@ export function MembersView({ ledger, initialOpen = false }) {
                 members: filtered,
                 expenses: ledger.expenses,
                 payments: ledger.payments,
-                includeExpenses: false,
-                includePayments: false,
+                paymentDetails: ledger.paymentDetails,
               })
             }
           />
@@ -136,6 +139,7 @@ export function MembersView({ ledger, initialOpen = false }) {
       ) : (
         <>
           {/* ==================== MOBILE SCREEN (< md) ==================== */}
+          {showMobile && (
           <div className="space-y-4 md:hidden">
             <SearchField
               value={query}
@@ -186,8 +190,10 @@ export function MembersView({ ledger, initialOpen = false }) {
               </div>
             )}
           </div>
+          )}
 
           {/* ==================== DESKTOP TABLE VIEW (md+) ==================== */}
+          {showDesktop && (
           <Card className="hidden md:block">
             <div className="border-b p-4">
               <div className="relative max-w-sm">
@@ -257,6 +263,7 @@ export function MembersView({ ledger, initialOpen = false }) {
             )}
             <Pagination page={safePage} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
           </Card>
+          )}
         </>
       )}
 

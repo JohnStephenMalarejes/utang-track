@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Sparkles, Users } from "lucide-react";
 import { saveExpense } from "@/app/actions/expenses";
 import { useServerAction } from "@/hooks/use-server-action";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input, MoneyInput } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/label";
+import { ReceiptUpload } from "@/components/ui/receipt-upload";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CATEGORIES } from "@/lib/constants";
 import { centsToDecimal, cn, formatPHP, parseAmount, splitEqual, sumCents, todayISO } from "@/lib/utils";
@@ -22,6 +23,7 @@ const blank = () => ({
   date: todayISO(),
   paidBy: "",
   notes: "",
+  receiptPath: null,
   mode: "equal",
   includeUser: true,
   userCustom: "",
@@ -29,8 +31,8 @@ const blank = () => ({
   custom: {},
 });
 
-/** Rebuild the form state from an existing expense. */
-function fromExpense(expense, members) {
+/** Rebuild the form state from an existing expense (for editing or duplicating). */
+function fromExpense(expense, members, { asDuplicate = false } = {}) {
   const selected = {};
   const custom = {};
   for (const s of expense.shares) {
@@ -49,9 +51,10 @@ function fromExpense(expense, members) {
     description: expense.description,
     category: expense.category,
     total: centsToDecimal(expense.totalCents),
-    date: expense.date,
+    date: asDuplicate ? todayISO() : expense.date,
     paidBy: expense.paidBy ?? "",
     notes: expense.notes,
+    receiptPath: asDuplicate ? null : expense.receiptPath ?? null,
     mode: isEqual ? "equal" : "custom",
     includeUser,
     userCustom: includeUser ? centsToDecimal(expense.userShareCents) : "",
@@ -60,22 +63,45 @@ function fromExpense(expense, members) {
   };
 }
 
-export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
+export function ExpenseFormDialog({ open, onOpenChange, ledger, expense, duplicateFrom = null }) {
   const editing = Boolean(expense);
-  const { members } = ledger;
+  const { members, expenses = [] } = ledger;
   const [form, setForm] = useState(blank);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const { pending, run } = useServerAction();
 
+  // Up to 4 unique recent bills as 1-tap quick templates when adding a new expense
+  const recentTemplates = useMemo(() => {
+    if (!open || editing || duplicateFrom) return [];
+    const seen = new Set();
+    const out = [];
+    for (const e of expenses) {
+      const key = `${e.category}::${e.description.trim().toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }, [open, editing, duplicateFrom, expenses]);
+
+  const lastExpense = expenses[0] ?? null;
+
   useEffect(() => {
     if (open) {
-      setForm(expense ? fromExpense(expense, members) : blank());
+      if (expense) {
+        setForm(fromExpense(expense, members));
+      } else if (duplicateFrom) {
+        setForm(fromExpense(duplicateFrom, members, { asDuplicate: true }));
+      } else {
+        setForm(blank());
+      }
       setError("");
       setSubmitted(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, expense?.id]);
+  }, [open, expense?.id, duplicateFrom?.id]);
 
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -111,6 +137,24 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
       // keep any amount already typed; only seed a blank one so nothing the user typed is overwritten
       custom: checked && form.custom[id] === undefined ? { ...form.custom, [id]: "" } : form.custom,
     });
+  }
+
+  function applySamePeopleAsLast() {
+    if (!lastExpense) return;
+    const validIds = new Set(members.map((m) => m.id));
+    const selected = {};
+    for (const s of lastExpense.shares) {
+      if (validIds.has(s.memberId)) selected[s.memberId] = true;
+    }
+    update({
+      includeUser: (lastExpense.userShareCents ?? 0) > 0,
+      selected,
+    });
+  }
+
+  function applyTemplate(tpl) {
+    setForm(fromExpense(tpl, members, { asDuplicate: true }));
+    setError("");
   }
 
   function switchMode(mode) {
@@ -154,10 +198,11 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
           expense_date: form.date,
           paid_by: form.paidBy,
           notes: form.notes,
+          receipt_path: form.receiptPath,
           shares: participants.map((m) => ({ member_id: m.id, share_amount: centsToDecimal(shareCents[m.id]) })),
         }),
       {
-        success: editing ? "Expense updated" : "Expense added",
+        success: editing ? "Expense updated" : duplicateFrom ? "Expense duplicated" : "Expense added",
         onSuccess: () => onOpenChange(false),
         silentError: true,
         onError: (r) => setError(r.error),
@@ -165,14 +210,17 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
     );
   }
 
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit expense" : "Add expense"}</DialogTitle>
-            <DialogDescription>Record a bill and decide who owes what.</DialogDescription>
+            <DialogTitle>{editing ? "Edit expense" : duplicateFrom ? "Duplicate expense" : "Add expense"}</DialogTitle>
+            <DialogDescription>
+              {duplicateFrom
+                ? "Pre-filled from a previous bill with today’s date. Adjust anything you need."
+                : "Record a bill and decide who owes what."}
+            </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="space-y-5">
@@ -184,6 +232,28 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                 </Link>
               </p>
             ) : null}
+
+            {!editing && !duplicateFrom && recentTemplates.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-500">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Quick fill from recent
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentTemplates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => applyTemplate(tpl)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      <span className="max-w-[10rem] truncate">{tpl.description}</span>
+                      <span className="tabular text-[11px] text-slate-400">{formatPHP(tpl.totalCents)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Description" htmlFor="exp-desc" className="sm:col-span-2">
@@ -246,7 +316,7 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                   </div>
                 </div>
 
-                <div className="flex gap-2 text-xs">
+                <div className="flex flex-wrap gap-1.5 text-xs">
                   <Button
                     type="button"
                     variant="ghost"
@@ -256,6 +326,11 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                   >
                     Select all
                   </Button>
+                  {lastExpense && (
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={applySamePeopleAsLast}>
+                      <Users className="h-3.5 w-3.5" /> Same as last bill
+                    </Button>
+                  )}
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => update({ selected: {} })}>
                     Clear
                   </Button>
@@ -344,9 +419,12 @@ export function ExpenseFormDialog({ open, onOpenChange, ledger, expense }) {
                 {form.mode === "custom" && !mismatch && participants.length > 0 && totalCents > 0 && allValid && (
                   <p className="text-xs text-muted-foreground">Shares add up to the total.</p>
                 )}
-
               </fieldset>
             )}
+
+            <Field label="Receipt photo (optional)">
+              <ReceiptUpload folder="expenses" value={form.receiptPath} onChange={(path) => update({ receiptPath: path })} label="Attach receipt photo" />
+            </Field>
 
             <Field label="Notes (optional)" htmlFor="exp-notes">
               <Textarea id="exp-notes" value={form.notes} onChange={(e) => update({ notes: e.target.value })} maxLength={1000} />

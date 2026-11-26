@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCheck, HandCoins, Pencil, Plus, Receipt, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCheck, Copy, HandCoins, Link2, Pencil, Plus, Receipt, Wallet } from "lucide-react";
+import { toast } from "sonner";
 import { settleMember } from "@/app/actions/payments";
 import { useServerAction } from "@/hooks/use-server-action";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,8 +29,9 @@ import {
   shortDate,
 } from "@/components/layout/mobile";
 import { MemberFormDialog } from "./member-form-dialog";
+import { ShareLinkDialog } from "./share-link-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
-import { buildMemberStatementPdf, formatDate, formatPHP, todayISO } from "@/lib/utils";
+import { buildMemberStatementPdf, buildSingilMessage, formatDate, formatPHP, todayISO } from "@/lib/utils";
 
 function Stat({ label, value, children }) {
   return (
@@ -39,15 +42,19 @@ function Stat({ label, value, children }) {
 }
 
 export function MemberDetail({ ledger, memberId }) {
-  const member = ledger.members.find((m) => m.id === memberId);
-  const shares = ledger.shares.filter((s) => s.memberId === memberId);
-  const payments = ledger.payments.filter((p) => p.memberId === memberId);
-  const openShares = shares.filter((s) => s.remainingCents > 0 && !s.isPayer);
+  const viewport = useViewport(768);
+  const showMobile = viewport !== "desktop";
+  const showDesktop = viewport !== "mobile";
+  const member = useMemo(() => ledger.members.find((m) => m.id === memberId), [ledger.members, memberId]);
+  const shares = useMemo(() => ledger.shares.filter((s) => s.memberId === memberId), [ledger.shares, memberId]);
+  const payments = useMemo(() => ledger.payments.filter((p) => p.memberId === memberId), [ledger.payments, memberId]);
+  const openShares = useMemo(() => shares.filter((s) => s.remainingCents > 0 && !s.isPayer), [shares]);
   const hasOutstanding = openShares.length > 0;
-  const openCents = openShares.reduce((sum, s) => sum + s.remainingCents, 0);
+  const openCents = useMemo(() => openShares.reduce((sum, s) => sum + s.remainingCents, 0), [openShares]);
 
   const [mobileTab, setMobileTab] = useState("expenses");
   const [editOpen, setEditOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payShare, setPayShare] = useState(null);
   const [settleOpen, setSettleOpen] = useState(false);
@@ -56,9 +63,26 @@ export function MemberDetail({ ledger, memberId }) {
   const paidPct = member.assignedCents > 0 ? Math.min(100, (member.paidCents / member.assignedCents) * 100) : 100;
   const statementFilename = `statement-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "member"}-${todayISO()}.pdf`;
 
+  async function copySingil() {
+    const shareUrl = member.shareToken && typeof window !== "undefined" ? `${window.location.origin}/s/${member.shareToken}` : "";
+    const text = buildSingilMessage({
+      memberName: member.name,
+      unpaidShares: openShares,
+      paymentDetails: ledger.paymentDetails,
+      shareUrl,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Singil message copied for ${member.name}`);
+    } catch {
+      toast.error("Could not copy reminder message");
+    }
+  }
+
   return (
     <>
       {/* ==================== MOBILE SCREEN (< md) ==================== */}
+      {showMobile && (
       <div className="space-y-6 md:hidden">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -71,12 +95,15 @@ export function MemberDetail({ ledger, memberId }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <IconButton aria-label={`Share statement link for ${member.name}`} onClick={() => setShareOpen(true)}>
+              <Link2 />
+            </IconButton>
             <PdfExportButton
               compact
               label="Statement"
               filename={statementFilename}
               shareTitle={`Statement for ${member.name}`}
-              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
+              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments, paymentDetails: ledger.paymentDetails })}
             />
             <IconButton aria-label={`Edit ${member.name}`} onClick={() => setEditOpen(true)}>
               <Pencil />
@@ -107,25 +134,35 @@ export function MemberDetail({ ledger, memberId }) {
           </div>
 
           {hasOutstanding && (
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <div className="mt-3 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSettleOpen(true)}
+                  className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white"
+                >
+                  <CheckCheck className="h-4 w-4 text-mint" strokeWidth={2.2} />
+                  Settle all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPayShare(null);
+                    setPayOpen(true);
+                  }}
+                  className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-[14px] font-semibold text-ink shadow-hairline"
+                >
+                  <HandCoins className="h-4 w-4 text-ink-muted" strokeWidth={1.9} />
+                  Record payment
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setSettleOpen(true)}
-                className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white"
+                onClick={copySingil}
+                className="press flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-[13.5px] font-medium text-ink shadow-hairline"
               >
-                <CheckCheck className="h-4 w-4 text-mint" strokeWidth={2.2} />
-                Settle all
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPayShare(null);
-                  setPayOpen(true);
-                }}
-                className="press flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-[14px] font-semibold text-ink shadow-hairline"
-              >
-                <HandCoins className="h-4 w-4 text-ink-muted" strokeWidth={1.9} />
-                Record payment
+                <Copy className="h-4 w-4 text-ink-muted" strokeWidth={1.9} />
+                Copy singil message
               </button>
             </div>
           )}
@@ -187,7 +224,7 @@ export function MemberDetail({ ledger, memberId }) {
                 <ListRow
                   key={p.id}
                   title={p.expenseDescription}
-                  subtitle={`${shortDate(p.date)}${p.notes ? ` · “${p.notes}”` : ""}`}
+                  subtitle={`${shortDate(p.date)} · ${p.paymentMethod}${p.notes ? ` · “${p.notes}”` : ""}`}
                   trailing={<span className="tabular shrink-0 text-[14.5px] font-semibold text-mint-deep">+{formatPHP(p.amountCents)}</span>}
                 />
               ))
@@ -195,8 +232,10 @@ export function MemberDetail({ ledger, memberId }) {
           </ListGroup>
         )}
       </div>
+      )}
 
       {/* ==================== DESKTOP VIEW (md+) ==================== */}
+      {showDesktop && (
       <div className="hidden md:block">
         <div className="mb-7 flex flex-row items-center justify-between gap-3.5">
           <div className="flex min-w-0 items-center gap-4">
@@ -212,11 +251,19 @@ export function MemberDetail({ ledger, memberId }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {hasOutstanding && (
+              <Button variant="outline" size="sm" className="sm:h-9 sm:px-3.5" onClick={copySingil}>
+                <Copy /> Copy singil
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setShareOpen(true)}>
+              <Link2 /> Share link
+            </Button>
             <PdfExportButton
               label="Statement"
               filename={statementFilename}
               shareTitle={`Statement for ${member.name}`}
-              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments })}
+              getPdfBytes={() => buildMemberStatementPdf({ member, shares, payments, paymentDetails: ledger.paymentDetails })}
             />
             <Button variant="outline" size="sm" className="sm:h-9 sm:px-3.5" onClick={() => setEditOpen(true)}>
               <Pencil /> Edit
@@ -330,7 +377,8 @@ export function MemberDetail({ ledger, memberId }) {
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Date</TableHead>
                     <TableHead>Expense</TableHead>
-                    <TableHead className="hidden sm:table-cell">Notes</TableHead>
+                    <TableHead className="hidden sm:table-cell">Method</TableHead>
+                    <TableHead className="hidden md:table-cell">Notes</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -339,7 +387,10 @@ export function MemberDetail({ ledger, memberId }) {
                     <TableRow key={p.id}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(p.date)}</TableCell>
                       <TableCell>{p.expenseDescription}</TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">{p.notes || "—"}</TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge variant="outline">{p.paymentMethod}</Badge>
+                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground md:table-cell">{p.notes || "—"}</TableCell>
                       <TableCell className="text-right font-semibold tabular">{formatPHP(p.amountCents)}</TableCell>
                     </TableRow>
                   ))}
@@ -349,8 +400,10 @@ export function MemberDetail({ ledger, memberId }) {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <MemberFormDialog open={editOpen} onOpenChange={setEditOpen} member={member} />
+      <ShareLinkDialog open={shareOpen} onOpenChange={setShareOpen} member={member} />
       <PaymentFormDialog open={payOpen} onOpenChange={setPayOpen} ledger={ledger} preset={{ memberId, shareId: payShare }} />
       <ConfirmDialog
         open={settleOpen}

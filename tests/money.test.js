@@ -78,14 +78,18 @@ test("PDF generators produce valid PDF 1.4 byte streams in the custom date & tot
   assert.equal(blocks.dateSections[0].lines[1], "breakfast - egg and banana = 160 (11.75 arsenio, 41.75 marco kent)");
   assert.deepEqual(blocks.totalLines, ["ARSENIO = 11.75", "MARCO = 68.75", "KENT = 68.75"]);
 
-  const ledgerBytes = buildLedgerPdf({ members, expenses });
+  const ledgerBytes = buildLedgerPdf({ members, expenses, paymentDetails: "GCash: 0917-123-4567" });
   const text = new TextDecoder().decode(ledgerBytes);
   assert.ok(text.startsWith("%PDF-1.4\n"));
   assert.ok(text.endsWith("%%EOF"));
+  assert.ok(text.includes("UTANG TRACKER"));
+  assert.ok(text.includes("BALANCES DUE"));
+  assert.ok(text.includes("UNSETTLED EXPENSES"));
   assert.ok(text.includes("November 6"));
-  assert.ok(text.includes("pre-workout - bread = 81 \\(27 marco kent\\)"));
-  assert.ok(text.includes("TOTAL:"));
-  assert.ok(text.includes("MARCO = 68.75"));
+  assert.ok(text.includes("PHP 68.75"));
+  assert.ok(text.includes("HOW TO PAY"));
+  assert.ok(text.includes("GCash: 0917-123-4567"));
+  assert.ok(text.includes("Page 1 of 1"));
 
   const memberBytes = buildMemberStatementPdf({
     member: members[0],
@@ -104,4 +108,60 @@ test("PDF generators produce valid PDF 1.4 byte streams in the custom date & tot
 
   const expBytes = buildExpenseDetailPdf(expenses[0]);
   assert.ok(new TextDecoder().decode(expBytes).startsWith("%PDF-1.4\n"));
+});
+
+test("PDF excludes already settled expenses, settled shares, and settled members", () => {
+  const expenses = [
+    {
+      id: "e-settled",
+      date: "2026-11-05",
+      description: "fully paid coffee",
+      category: "Breakfast",
+      totalCents: 10000,
+      shares: [
+        { id: "s-old-1", memberId: "m-arsenio", memberName: "Arsenio", amountCents: 5000, remainingCents: 0, isPayer: false },
+        { id: "s-old-2", memberId: "m-marco", memberName: "Marco", amountCents: 5000, remainingCents: 0, isPayer: false },
+      ],
+    },
+    {
+      id: "e-mixed",
+      date: "2026-11-06",
+      description: "egg and banana",
+      category: "Breakfast",
+      totalCents: 16000,
+      shares: [
+        // Arsenio already settled his share; Marco partially paid (2000 remaining); Kent unpaid (4175 remaining)
+        { id: "s-mix-1", memberId: "m-arsenio", memberName: "Arsenio", amountCents: 1175, remainingCents: 0, isPayer: false },
+        { id: "s-mix-2", memberId: "m-marco", memberName: "Marco", amountCents: 4175, remainingCents: 2000, isPayer: false },
+        { id: "s-mix-3", memberId: "m-kent", memberName: "Kent", amountCents: 4175, remainingCents: 4175, isPayer: false },
+      ],
+    },
+  ];
+  const members = [
+    { id: "m-arsenio", name: "Arsenio", balanceCents: 0 },
+    { id: "m-marco", name: "Marco", balanceCents: 2000 },
+    { id: "m-kent", name: "Kent", balanceCents: 4175 },
+  ];
+
+  const blocks = buildFormattedReportBlocks({ expenses, members });
+  // November 5 (all settled) must not appear at all
+  assert.equal(blocks.dateSections.length, 1);
+  assert.equal(blocks.dateSections[0].dateHeading, "November 6");
+  // Arsenio (settled) is excluded; Marco shows remaining 20; Kent shows 41.75
+  assert.deepEqual(blocks.dateSections[0].lines, ["breakfast - egg and banana = 160 (20 marco, 41.75 kent)"]);
+  assert.deepEqual(blocks.totalLines, ["MARCO = 20", "KENT = 41.75"]);
+
+  // Member statement PDF for a settled member has no settled items
+  const settledMemberPdf = new TextDecoder().decode(
+    buildMemberStatementPdf({
+      member: members[0],
+      shares: [
+        { id: "s-old-1", expenseDate: "2026-11-05", expenseDescription: "fully paid coffee", expenseCategory: "Breakfast", amountCents: 5000, remainingCents: 0, isPayer: false },
+      ],
+      paymentDetails: "GCash: 0917-123-4567",
+    })
+  );
+  assert.ok(settledMemberPdf.includes("No unsettled utang."));
+  assert.ok(!settledMemberPdf.includes("fully paid coffee"));
+  assert.ok(!settledMemberPdf.includes("ARSENIO"));
 });

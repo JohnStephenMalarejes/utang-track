@@ -5,6 +5,10 @@ import { expenseSchema, firstError } from "@/lib/validations/schemas";
 import { parseAmount, centsToDecimal } from "@/lib/utils/money";
 import { fail, succeed, withAuth } from "@/lib/action-helpers";
 
+function isMissingColumnError(error) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 /** Creates or updates an expense and its shares. */
 export async function saveExpense(input) {
   const parsed = expenseSchema.safeParse(input);
@@ -12,7 +16,7 @@ export async function saveExpense(input) {
   const v = parsed.data;
 
   return withAuth(async (supabase) => {
-    const expenseRow = {
+    const baseRow = {
       description: v.description.trim(),
       category: v.category,
       total_amount: centsToDecimal(parseAmount(v.total_amount)),
@@ -20,9 +24,15 @@ export async function saveExpense(input) {
       paid_by: v.paid_by || null,
       notes: v.notes?.trim() ? v.notes.trim() : null,
     };
+    const expenseRow = { ...baseRow, receipt_path: v.receipt_path || null };
 
     if (!v.id) {
-      const { data: created, error: expErr } = await supabase.from("expenses").insert(expenseRow).select("id").single();
+      let { data: created, error: expErr } = await supabase.from("expenses").insert(expenseRow).select("id").single();
+      if (expErr && isMissingColumnError(expErr) && !v.receipt_path) {
+        ({ data: created, error: expErr } = await supabase.from("expenses").insert(baseRow).select("id").single());
+      } else if (expErr && isMissingColumnError(expErr)) {
+        return fail("Run supabase/migrations/0004_features.sql in Supabase first to attach receipt photos.");
+      }
       if (expErr) return fail(expErr);
 
       const shareRows = v.shares.map((s) => ({
@@ -51,14 +61,19 @@ export async function saveExpense(input) {
         return fail(`Cannot remove participant(s) who already have payments: ${names}. Delete those payments first.`);
       }
 
-      if (expenseRow.paid_by) {
-        const payerShare = (existingShares || []).find((es) => es.member_id === expenseRow.paid_by);
+      if (baseRow.paid_by) {
+        const payerShare = (existingShares || []).find((es) => es.member_id === baseRow.paid_by);
         if (payerShare?.payments?.length > 0) {
           return fail("The selected payer already has payments recorded on this expense. Delete those payments first.");
         }
       }
 
-      const { error: updErr } = await supabase.from("expenses").update(expenseRow).eq("id", v.id);
+      let { error: updErr } = await supabase.from("expenses").update(expenseRow).eq("id", v.id);
+      if (updErr && isMissingColumnError(updErr) && !v.receipt_path) {
+        ({ error: updErr } = await supabase.from("expenses").update(baseRow).eq("id", v.id));
+      } else if (updErr && isMissingColumnError(updErr)) {
+        return fail("Run supabase/migrations/0004_features.sql in Supabase first to attach receipt photos.");
+      }
       if (updErr) return fail(updErr);
 
       const toRemoveIds = (existingShares || []).filter((es) => !keepMemberIds.has(es.member_id)).map((es) => es.id);

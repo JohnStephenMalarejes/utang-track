@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 
 const TINTS = [
@@ -22,7 +23,7 @@ export function initials(name = "") {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function Avatar({ name, id, size = "md", className }) {
+export const Avatar = memo(function Avatar({ name, id, size = "md", className }) {
   const tint = TINTS[hash(id || name || "") % TINTS.length];
   return (
     <span
@@ -37,4 +38,4 @@ export function Avatar({ name, id, size = "md", className }) {
       {initials(name)}
     </span>
   );
-}
+});

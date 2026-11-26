@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildLedger } from "../lib/calculations/ledger.js";
+import { buildLedger, allocateMemberPayment, groupPaymentsByBatch } from "../lib/calculations/ledger.js";
 import { summarize, categoryTotals, expenseEntries } from "../lib/calculations/analytics.js";
+import { memberPaymentSchema, paymentDetailsSchema } from "../lib/validations/schemas.js";
+import { buildSingilMessage } from "../lib/utils/reminder.js";
 
 const members = [
   { id: "m-ana", name: "Ana" },
@@ -107,4 +109,111 @@ test("reports: period summaries and category totals", () => {
   assert.deepEqual(summarize(entries, "daily").map((r) => r.totalCents), [10000, 25050]);
   assert.deepEqual(categoryTotals(entries).map((r) => r.category), ["Dinner", "Lunch"]);
   assert.equal(expenseEntries(l.expenses, "m-ben").reduce((a, e) => a + e.amountCents, 0), 3333 + 15050);
+});
+
+test("allocateMemberPayment settles all unpaid shares oldest-first and skips payer/settled shares", () => {
+  const shares = [
+    { id: "s-newer", remainingCents: 15050, isPayer: false, expenseDate: "2025-03-05" },
+    { id: "s-payer", remainingCents: 5000, isPayer: true, expenseDate: "2025-03-01" },
+    { id: "s-older", remainingCents: 3333, isPayer: false, expenseDate: "2025-03-03" },
+    { id: "s-settled", remainingCents: 0, isPayer: false, expenseDate: "2025-03-02" },
+    { id: "s-overpaid", remainingCents: -200, isPayer: false, expenseDate: "2025-03-04" },
+  ];
+
+  // Pay all unpaid utang at once
+  const full = allocateMemberPayment(shares, 3333 + 15050);
+  assert.equal(full.totalRemainingCents, 18383);
+  assert.equal(full.allocatedCents, 18383);
+  assert.equal(full.excessCents, 0);
+  assert.deepEqual(
+    full.allocations.map((a) => [a.share.id, a.amountCents, a.settlesShare]),
+    [
+      ["s-older", 3333, true],
+      ["s-newer", 15050, true],
+    ]
+  );
+
+  // Partial lump-sum allocates oldest-first
+  const partial = allocateMemberPayment(shares, 5000);
+  assert.equal(partial.allocatedCents, 5000);
+  assert.equal(partial.excessCents, 0);
+  assert.deepEqual(
+    partial.allocations.map((a) => [a.share.id, a.amountCents, a.settlesShare]),
+    [
+      ["s-older", 3333, true],
+      ["s-newer", 1667, false],
+    ]
+  );
+
+  // Excess over total remaining is reported cleanly
+  const excess = allocateMemberPayment(shares, 20000);
+  assert.equal(excess.allocatedCents, 18383);
+  assert.equal(excess.excessCents, 1617);
+});
+
+test("memberPaymentSchema validates bulk member payment input", () => {
+  const valid = memberPaymentSchema.safeParse({
+    member_id: "550e8400-e29b-41d4-a716-446655440000",
+    amount: "183.83",
+    payment_date: "2025-03-10",
+    payment_method: "GCash",
+    notes: "GCash full payment",
+    receipt_path: "payments/abc-123.jpg",
+  });
+  assert.equal(valid.success, true);
+
+  const invalidZero = memberPaymentSchema.safeParse({
+    member_id: "550e8400-e29b-41d4-a716-446655440000",
+    amount: "0",
+    payment_date: "2025-03-10",
+  });
+  assert.equal(invalidZero.success, false);
+
+  const invalidPath = memberPaymentSchema.safeParse({
+    member_id: "550e8400-e29b-41d4-a716-446655440000",
+    amount: "50",
+    payment_date: "2025-03-10",
+    receipt_path: "../etc/passwd",
+  });
+  assert.equal(invalidPath.success, false);
+});
+
+test("buildSingilMessage formats unpaid breakdown with payment details and share link", () => {
+  const msg = buildSingilMessage({
+    memberName: "Marco",
+    unpaidShares: [
+      { id: "s2", expenseDate: "2026-11-06", expenseCategory: "Breakfast", expenseDescription: "egg and banana", owedCents: 4175, paidCents: 0, remainingCents: 4175, isPayer: false },
+      { id: "s1", expenseDate: "2026-11-05", expenseCategory: "Pre-workout", expenseDescription: "bread", owedCents: 2700, paidCents: 0, remainingCents: 2700, isPayer: false },
+    ],
+    paymentDetails: "GCash: 0917-123-4567",
+    shareUrl: "https://example.com/s/tok12345678901234",
+  });
+
+  assert.ok(msg.includes("Hi Marco! Here's your unpaid utang (₱68.75 total):"));
+  assert.ok(msg.indexOf("bread") < msg.indexOf("egg and banana"));
+  assert.ok(msg.includes("GCash: 0917-123-4567"));
+  assert.ok(msg.includes("Live statement: https://example.com/s/tok12345678901234"));
+});
+
+test("groupPaymentsByBatch collapses multi-item batches while preserving single payments", () => {
+  const rows = [
+    { id: "p1", memberId: "m1", memberName: "Marco", date: "2026-11-08", amountCents: 2700, paymentMethod: "GCash", batchId: "b-1", notes: "Paid all", expenseDescription: "bread", receiptPath: "payments/a.png" },
+    { id: "p2", memberId: "m1", memberName: "Marco", date: "2026-11-08", amountCents: 4175, paymentMethod: "GCash", batchId: "b-1", notes: "Paid all", expenseDescription: "egg", receiptPath: "payments/a.png" },
+    { id: "p3", memberId: "m2", memberName: "Kent", date: "2026-11-07", amountCents: 5000, paymentMethod: "Cash", batchId: null, notes: "", expenseDescription: "lunch", receiptPath: null },
+  ];
+
+  const grouped = groupPaymentsByBatch(rows);
+  assert.equal(grouped.length, 2);
+  assert.equal(grouped[0].isBatch, true);
+  assert.equal(grouped[0].amountCents, 6875);
+  assert.equal(grouped[0].items.length, 2);
+  assert.equal(grouped[0].receiptPath, "payments/a.png");
+  assert.equal(grouped[1].isBatch, false);
+  assert.equal(grouped[1].id, "p3");
+});
+
+test("paymentDetailsSchema accepts and trims payment instructions", () => {
+  const ok = paymentDetailsSchema.safeParse({ payment_details: "  GCash: 0917-000-0000  " });
+  assert.equal(ok.success, true);
+  assert.equal(ok.data.payment_details, "GCash: 0917-000-0000");
 });

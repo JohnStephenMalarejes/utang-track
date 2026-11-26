@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { BarChart3, ChevronLeft, ChevronRight, HandCoins, LayoutDashboard, LogOut, Plus, Receipt, Settings, UserPlus, Users, Wallet } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
+import { useViewport } from "@/hooks/use-viewport";
 import { Button } from "@/components/ui/button";
 import { ActionSheet } from "@/components/layout/mobile";
 import { cn } from "@/lib/utils";
@@ -150,7 +151,7 @@ function Topbar({ pathname }) {
   const isDetail = current && pathname !== current.href;
 
   return (
-    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-8 backdrop-blur lg:flex">
+    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-slate-200 bg-white/[0.98] px-8 lg:flex">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px]">
         <span className="text-slate-500">Utang Tracker</span>
         {current && (
@@ -198,7 +199,7 @@ function MobileAppShell({ pathname, email }) {
   return (
     <>
       {/* Top bar: brand on root screens, back button on detail screens */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-canvas/90 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-canvas/[0.98] pt-[env(safe-area-inset-top)] lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           {isDetail ? (
             <Link href={current.href} className="press -ml-1.5 inline-flex h-10 items-center gap-0.5 rounded-full pl-1 pr-3 text-[15px] font-medium text-ink" aria-label={`Back to ${current.label}`}>
@@ -242,7 +243,7 @@ function MobileAppShell({ pathname, email }) {
       </header>
 
       {/* Bottom tab bar */}
-      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/[0.98] pb-[env(safe-area-inset-bottom)] lg:hidden">
         <div className="mx-auto grid h-[60px] max-w-lg grid-cols-5 items-center px-2">
           {MOBILE_TABS.slice(0, 2).map((tab) => (
             <TabLink key={tab.href} {...tab} active={isActive(pathname, tab.href)} />
@@ -294,22 +295,28 @@ function TabLink({ href, label, icon: Icon, active }) {
 
 export function Sidebar({ email }) {
   const pathname = usePathname();
+  const viewport = useViewport(1024);
+  const showDesktop = viewport !== "mobile";
+  const showMobile = viewport !== "desktop";
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-slate-900 text-slate-100 lg:flex">
-        <div className="flex h-14 items-center border-b border-slate-800 px-5">
-          <Brand />
-        </div>
-        <SidebarPanel email={email} pathname={pathname} />
-      </aside>
+      {showDesktop && (
+        <>
+          {/* Desktop Sidebar */}
+          <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-slate-900 text-slate-100 lg:flex">
+            <div className="flex h-14 items-center border-b border-slate-800 px-5">
+              <Brand />
+            </div>
+            <SidebarPanel email={email} pathname={pathname} />
+          </aside>
 
-      {/* Desktop Topbar */}
-      <Topbar pathname={pathname} />
+          {/* Desktop Topbar */}
+          <Topbar pathname={pathname} />
+        </>
+      )}
 
-      {/* Mobile Screen App Bar + Bottom Navigation */}
-      <MobileAppShell pathname={pathname} email={email} />
+      {showMobile && <MobileAppShell pathname={pathname} email={email} />}
     </>
   );
 }

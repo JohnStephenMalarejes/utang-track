@@ -14,23 +14,47 @@ import { STATUS_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
-/* Dates                                                               */
+/* Dates (memoized to avoid repeated parseISO/format on list renders)  */
 /* ------------------------------------------------------------------ */
+
+const MAX_DATE_CACHE = 400;
+const dayLabelCache = new Map();
+const shortDateCache = new Map();
+
+function todayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+}
 
 /** "Today", "Yesterday", or "Mon, Nov 10" for a YYYY-MM-DD string. */
 export function dayLabel(iso) {
   if (!iso) return "—";
+  const key = `${todayKey()}:${iso}`;
+  const hit = dayLabelCache.get(key);
+  if (hit !== undefined) return hit;
   const d = parseISO(iso);
-  if (isToday(d)) return "Today";
-  if (isYesterday(d)) return "Yesterday";
-  return format(d, d.getFullYear() === new Date().getFullYear() ? "EEE, MMM d" : "EEE, MMM d, yyyy");
+  const val = isToday(d)
+    ? "Today"
+    : isYesterday(d)
+      ? "Yesterday"
+      : format(d, d.getFullYear() === new Date().getFullYear() ? "EEE, MMM d" : "EEE, MMM d, yyyy");
+  if (dayLabelCache.size >= MAX_DATE_CACHE) dayLabelCache.clear();
+  dayLabelCache.set(key, val);
+  return val;
 }
 
 /** Compact date for row metadata: "Nov 10". */
 export function shortDate(iso) {
   if (!iso) return "—";
+  const year = new Date().getFullYear();
+  const key = `${year}:${iso}`;
+  const hit = shortDateCache.get(key);
+  if (hit !== undefined) return hit;
   const d = parseISO(iso);
-  return format(d, d.getFullYear() === new Date().getFullYear() ? "MMM d" : "MMM d, yyyy");
+  const val = format(d, d.getFullYear() === year ? "MMM d" : "MMM d, yyyy");
+  if (shortDateCache.size >= MAX_DATE_CACHE) shortDateCache.clear();
+  shortDateCache.set(key, val);
+  return val;
 }
 
 /** Groups items (already sorted) by a date key, preserving order. */

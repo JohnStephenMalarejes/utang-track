@@ -1,4 +1,4 @@
-const CACHE_NAME = "utang-tracker-v1";
+const CACHE_NAME = "utang-tracker-v2";
 const STATIC_ASSETS = [
   "/logo-mark.png",
   "/logo-full.png",
@@ -38,7 +38,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Cache-first for static assets and images
+  // Never intercept API routes or Next.js dev/HMR endpoints
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/webpack-hmr")) return;
+
+  const isLocalDev = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (isLocalDev) return;
+
+  // Cache-first for static images and immutable hashed production chunks
   if (
     url.pathname.startsWith("/_next/static/") ||
     STATIC_ASSETS.includes(url.pathname) ||

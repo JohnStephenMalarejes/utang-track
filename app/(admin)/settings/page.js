@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/layout/export-button";
+import { PaymentDetailsForm } from "@/components/settings/payment-details-form";
 import { ListGroup, ListRow, SectionLabel } from "@/components/layout/mobile";
 
 export const metadata = { title: "Settings" };
@@ -54,6 +55,13 @@ export default async function SettingsPage() {
           </ListGroup>
         </section>
 
+        <section aria-label="Payment details">
+          <SectionLabel>Payment details</SectionLabel>
+          <div className="rounded-2xl bg-white p-4 shadow-hairline">
+            <PaymentDetailsForm initialValue={ledger.paymentDetails} />
+          </div>
+        </section>
+
         <section aria-label="Ledger records">
           <SectionLabel>Ledger</SectionLabel>
           <ListGroup>
@@ -90,6 +98,16 @@ export default async function SettingsPage() {
                 <LogOut /> Sign out
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment details</CardTitle>
+            <CardDescription>Saved account info appended to singil messages, PDF statements, and live share links.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PaymentDetailsForm initialValue={ledger.paymentDetails} />
           </CardContent>
         </Card>
 
